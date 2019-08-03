@@ -1,0 +1,690 @@
+#!/usr/bin/env python3
+
+import glob
+import os
+import re
+import subprocess
+import sys
+from shutil import which
+
+if os.name == 'nt':
+    print("Please use mintty in Windows")
+    sys.exit()
+
+HAS_OUTPUT = False
+PACKS = {}
+ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
+            'move2opt', 'move2start', 'install', 'remotes' ]
+PROCESSING, QUEUE, ACTION, DECO = [], [], '', True
+
+SHOW_SIZE, NO_OUTPUT, ASYNC = False, False, True
+
+INSTDIR, INSTOPT, INSTALL = 'vpacks', False, False
+
+COLORS = {
+    'darkred':     '\33[31m',
+    'darkgreen':   '\33[32m',
+    'darkyellow':  '\33[33m',
+    'darkblue':    '\33[34m',
+    'darkviolet':  '\33[35m',
+    'darkcyan':    '\33[36m',
+    'red':         '\33[91m',
+    'green':       '\33[92m',
+    'yellow':      '\33[93m',
+    'blue':        '\33[94m',
+    'violet':      '\33[95m',
+    'cyan':        '\33[96m',
+}
+
+#------------------------------------------------------------------------------
+# Package class
+#------------------------------------------------------------------------------
+
+
+class Package():
+    """Class for vim packages."""
+    def __init__(self, name, path=None):
+        self.name = name
+        self.path = PACKS['packs'][self.name] if not path else path
+        self.is_package, self.process = True, None
+
+    #--------------------------------------------------------------------------
+    # class helpers: specific to this class
+    #--------------------------------------------------------------------------
+
+    def packdir(self):
+        return re.sub('/(opt|start)/' + self.name + '$', '', self.path)
+
+    def is_opt(self):
+        return re.search('opt/' + self.name + '$', self.path)
+
+    def is_start(self):
+        return re.search('start/' + self.name + '$', self.path)
+
+    def shell(self, cmd):
+        """Run a shell command, return stdout and stderr."""
+        res = subprocess.run(cmd.split(' '), cwd=self.path,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        return [res.stdout.decode('utf-8'), res.stderr.decode('utf-8')]
+
+    def async_shell(self, cmd):
+        """Run a shell command asynchronously."""
+        return subprocess.Popen(cmd.split(' '), cwd=self.path,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+
+    def size(self):
+        s = subprocess.run(['du', '-chs'], cwd=self.path,
+                           stdout=subprocess.PIPE)
+        return s.stdout.decode('utf-8').split('\n')[0].replace('\t.', '')
+
+    def verbose_output(self, cmd, nl=False):
+        n = '\n' if nl else ''
+        name = '\n' + color('green', self.name) + ': ' + n
+        if cmd[1]:
+            return name + color('red', cmd[1]) + '\n'
+        elif cmd[0]:
+            c = cmd[0].replace('nothing to commit, working tree clean\n', '')
+            return name + c
+
+    def output(self, cmd):
+        name = "%-20s" % (self.name + ': ')
+        if cmd[1]:
+            if ( cmd[1][:5] == 'fatal' ):
+                fatal = color('red', 'fatal')
+                rest = re.sub('\..*', '.', cmd[1].split('\n')[0][5:])
+                return name + fatal + rest + '\n'
+            else:
+                error = color('red', cmd[1].split('\n')[0])
+                return name + error + '\n'
+        elif cmd[0]:
+            if ACTION == 'fetch':
+                c = cmd[0].replace('Fetching ', '').split('\n')
+                c = 'Fetching ' + ', '.join(c[:-1]) + '\n'
+            elif ACTION == 'remotes':
+                c = ', '.join(reversed(cmd[0].splitlines())) + '\n'
+            else:
+                c = cmd[0].replace('Already up-to-date.', color('green', 'ok'))
+            return name + c
+        return ''
+
+    #--------------------------------------------------------------------------
+    # class commands: methods names have their correspective in Packdir class
+    #--------------------------------------------------------------------------
+
+    def list(self, show_size=None):
+        cmd = self.shell('git status --porcelain')
+        if not DECO:
+            log(self.name)
+            return
+        fmt = "%-35s %-5s %10s"
+        size = self.size() if (show_size is None and SHOW_SIZE) else ''
+        if cmd[1]:
+            log(fmt % (color('red', self.name), color('red', 'ER'), size))
+        elif cmd[0]:
+            mod, unt = False, False
+            for line in cmd[0].split('\n'):
+                if not line:
+                    continue
+                if not mod:
+                    mod = line[0] == 'M'
+                if not unt:
+                    unt = line[0] == '?'
+            sig = 'M?' if (mod and unt) else ' M' if mod else ' ?'
+            log(fmt % (color('cyan', self.name), color('red', sig), size))
+        else:
+            log("%-26s %-5s %10s" % (self.name, color('green', 'ok'), size))
+
+    def update(self):
+        self.process = self.async_shell('git pull --ff-only')
+        PROCESSING.append(self)
+        if not ASYNC:
+            self.process.wait()
+
+    def status(self):
+        cmd = self.shell('git status --porcelain')
+        name = color('green', self.name)
+        if cmd[1]:
+            return name + ': ' + color('red', cmd[1])
+        elif cmd[0]:
+            mod, rest = cmd[0][:1], cmd[0][2:]
+            return '\n' + name + ':\n' + color('red', mod) + rest
+        return ''
+
+    def verbose(self):
+        return self.verbose_output(
+            self.shell('git -c color.ui=always status -vv'))
+
+    def remotes(self):
+        return self.output(self.shell('git remote'))
+
+    def git(self):
+        return self.verbose_output(
+            self.shell('git -c color.ui=always ' + GIT), nl=True)
+
+    def fetch(self):
+        self.process = self.async_shell('git fetch --all')
+        PROCESSING.append(self)
+        if not ASYNC:
+            self.process.wait()
+
+    def move2opt(self):
+        name = color('green', self.name)
+        pdir = self.packdir()
+        if self.is_opt():
+            log(name + " is already in /opt")
+        else:
+            log("Moving " + name + " to /opt")
+            subprocess.run(['mv', self.path, pdir + '/opt'])
+            PACKS['packs'][self.name] = pdir + '/opt/' + self.name
+        Packdir(os.path.basename(pdir)).list(show_size=False)
+
+    def move2start(self):
+        name = color('green', self.name)
+        pdir = self.packdir()
+        if self.is_start():
+            log(name + " is already in /start")
+        else:
+            log("Moving " + name + " to /start")
+            subprocess.run(['mv', self.path, pdir + '/start'])
+            PACKS['packs'][self.name] = pdir + '/start/' + self.name
+        Packdir(os.path.basename(pdir)).list(show_size=False)
+
+
+#------------------------------------------------------------------------------
+# Package directory class
+#------------------------------------------------------------------------------
+
+
+class Packdir():
+    """Class for base package directories."""
+    def __init__(self, name, path=None):
+        self.name = name
+        self.path = PACKS['dirs'][self.name] if not path else path
+        self.is_package = False
+        self.has_output_opt = False
+        self.has_output_start = False
+
+    #--------------------------------------------------------------------------
+    # class helpers: specific to this class
+    #--------------------------------------------------------------------------
+
+    def is_valid(self):
+        return os.path.exists(self.path)
+
+    def ensure_exists(self):
+        if ( not self.is_valid() ):
+            os.makedirs(self.path + '/opt')
+            os.makedirs(self.path + '/start')
+            PACKS['dirs'][self.name] = PACKS['vimdir'] + '/pack/' + self.path
+
+    def has(self, pack, in_opt=False, in_start=False):
+        """Check if package is contained in this packdir."""
+        if not in_start:
+            for p in self.walk('opt'):
+                if os.path.basename(p) == pack:
+                    return p
+        if not in_opt:
+            for p in self.walk('start'):
+                if os.path.basename(p) == pack:
+                    return p
+
+    def header(self, path):
+        if ( not DECO or not os.path.exists(path) or not os.listdir(path) ):
+            return
+        blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
+        log("\n" + blue + "─" * 67 + end)
+        log(bold + blue + "Packs in directory " + yelw + path + "/" + end)
+        log(blue + "─" * 67 + end + "\n")
+
+    def walk(self, subdir):
+        if ( os.path.exists(self.path + '/' + subdir) ):
+            return glob.iglob(self.path + '/' + subdir + '/*')
+        return []
+
+    def output(self, output, subdir):
+        """Print the header only if there's some package to display."""
+        if ( not output ):
+            return
+        if ( not self.has_output_opt and subdir == 'opt' ):
+            self.has_output_opt = True
+            self.header(self.path + '/opt')
+        if ( not self.has_output_start and subdir == 'start' ):
+            self.has_output_start = True
+            self.header(self.path + '/start')
+        log(output, end='')
+
+    def install(self, repo):
+        if not self.has(repo['name']):
+            repo['process'] = subprocess.Popen(
+                ['git', 'clone', '--depth', '1',
+                 '--shallow-submodules', repo['address']],
+                cwd=self.path + ('/opt' if INSTOPT else '/start'),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT
+            )
+            PROCESSING.append(repo)
+            if not ASYNC:
+                repo['process'].wait()
+
+    #--------------------------------------------------------------------------
+    # class commands: methods names have their correspective in Package class
+    #--------------------------------------------------------------------------
+
+    def list(self, show_size=None):
+        self.header(self.path + '/opt')
+        for p in self.walk('opt'):
+            Package(os.path.basename(p)).list(show_size)
+        self.header(self.path + '/start')
+        for p in self.walk('start'):
+            Package(os.path.basename(p)).list(show_size)
+
+    def update(self):
+        for p in self.walk('opt'):
+            Package(os.path.basename(p)).update()
+        process_asynch(self, 'opt')
+        for p in self.walk('start'):
+            Package(os.path.basename(p)).update()
+        process_asynch(self, 'start')
+
+    def status(self):
+        for p in self.walk('opt'):
+            self.output(Package(os.path.basename(p)).status(), 'opt')
+        for p in self.walk('start'):
+            self.output(Package(os.path.basename(p)).status(), 'start')
+
+    def verbose(self):
+        for p in self.walk('opt'):
+            self.output(Package(os.path.basename(p)).verbose(), 'opt')
+        for p in self.walk('start'):
+            self.output(Package(os.path.basename(p)).verbose(), 'start')
+
+    def remotes(self):
+        for p in self.walk('opt'):
+            self.output(Package(os.path.basename(p)).remotes(), 'opt')
+        for p in self.walk('start'):
+            self.output(Package(os.path.basename(p)).remotes(), 'start')
+
+    def git(self):
+        for p in self.walk('opt'):
+            self.output(Package(os.path.basename(p)).git(), 'opt')
+        for p in self.walk('start'):
+            self.output(Package(os.path.basename(p)).git(), 'start')
+
+    def fetch(self):
+        for p in self.walk('opt'):
+            Package(os.path.basename(p)).fetch()
+        process_asynch(self, 'opt')
+        for p in self.walk('start'):
+            Package(os.path.basename(p)).fetch()
+        process_asynch(self, 'start')
+
+    def move2opt(self):
+        opt = color('green', self.path + '/opt/')
+        start = color('green', self.path + '/start/')
+        if confirm("Move all packages in " + start + "\n%21s" % "to " + opt):
+            os.makedirs(opt, exist_ok=True)
+            for p in self.walk('start'):
+                Package(os.path.basename(p)).move2opt()
+
+    def move2start(self):
+        opt = color('green', self.path + '/opt/')
+        start = color('green', self.path + '/start/')
+        if confirm("Move all packages in " + opt + "\n%21s" % "to " + start):
+            os.makedirs(start, exist_ok=True)
+            for p in self.walk('opt'):
+                Package(os.path.basename(p)).move2start()
+
+#------------------------------------------------------------------------------
+# HELP
+#------------------------------------------------------------------------------
+
+
+def print_help():
+    """Print the help and exit."""
+    commands = [
+        ['list',        'list packages'],
+        ['update',      'update packages'],
+        ['status',      'list only packages with a dirty working tree'],
+        ['verbose',     'verbose status (with diff)'],
+        ['remotes',     'list remotes for packages'],
+        ['fetch',       'fetch all remotes'],
+        ['git',         'run a single, quoted git command'],
+        ['install',     'install packages from remote repos'],
+        ['move2opt',    'move package(s) into the /opt directory'],
+        ['move2start',  'move package(s) into the /start directory'],
+    ]
+
+    options = [
+        ['-nd',  'no decorations (color, headers)'],
+        ['-ps',  'print size for "list" subcommand'],
+        ['-no',  'no output (for use inside scripts)'],
+        ['-na',  'no async update/cloning'],
+    ]
+
+    instopts = [
+        ['opt',     'install in /opt directory rather than in /start'],
+        ['dir=DIR', 'set base installation directory for packages'],
+    ]
+
+    examples = [
+        ['List all packages in the pack/my_packs/*/* directories',
+         'vpacks list my_packs'],
+        ['Verbose status for selected packages',
+         'vpacks verbose visual-multi yanktools'],
+        ['Run git command',
+         'vpacks git "branch --list" my_packs'],
+        ['Install a package in the default ("vpacks") directory, as opt type',
+         'vpacks install opt mg979/visual-multi'],
+        ['Install packages in specific directory',
+         'vpacks install dir=my_packs mg979/visual-multi'],
+    ]
+
+    print()
+    print("Usage:\tvpacks [options] COMMAND [pack | directory]")
+    print("\tvpacks [options] install [instopts] REPOS")
+    print()
+    print("Commands:")
+    for c in commands:
+        print("\t" + "%-20s" % color('green', c[0]) + c[1])
+    print()
+    print("Options:")
+    for o in options:
+        print("\t" + "%-20s" % color('green', o[0]) + o[1])
+    print()
+    print("Installation options:")
+    for o in instopts:
+        print("\t" + "%-20s" % color('green', o[0]) + o[1])
+    print()
+    print("Examples:")
+    print()
+    for e in examples:
+        print('\t' + e[0] + '\n\t' + color('darkgreen', e[1]) + '\n')
+    sys.exit()
+
+
+#------------------------------------------------------------------------------
+# GENERIC HELPERS
+#------------------------------------------------------------------------------
+
+
+def error(string):
+    """Print an error and exit."""
+    print(string)
+    sys.exit()
+
+
+def color(color, string, bold=False, line=False):
+    """Print a colored string."""
+    if not DECO:
+        return string
+    b = '\033[1m' if bold else ''
+    l = '\033[4m' if line else ''
+    return COLORS[color] + b + l + string + '\033[0m'
+
+
+def log(string, end='\n'):
+    """Print output if allowed."""
+    if not NO_OUTPUT and string:
+        print(string, end=end)
+
+
+def clear_screen():
+    """Clear the terminal window."""
+    if NO_OUTPUT or ACTION in ['git']:
+        return
+    os.system('clear')
+
+
+def confirm(string):
+    """Always return True with -no option."""
+    if NO_OUTPUT:
+        return True
+    print(string + '    ? (y/n)')
+    return sys.stdin.read(1) == 'y'
+
+
+def find_packs():
+    """Find vim and package directories and basenames."""
+    win = os.path.expanduser('~\\vimfiles')
+    nwin = os.path.expanduser('~/.vim')
+    PACKS['vimdir'] = win if os.path.exists(win) else nwin
+    dirpaths = glob.glob(PACKS['vimdir'] + '/pack/*')
+    PACKS['dirs'] = {os.path.basename(folder): folder for folder in dirpaths}
+    packpaths = glob.glob(PACKS['vimdir'] + '/pack/*/*/*')
+    PACKS['packs'] = {os.path.basename(pack): pack for pack in packpaths}
+
+
+#------------------------------------------------------------------------------
+# COMMAND-LINE ARGUMENTS PARSING
+#------------------------------------------------------------------------------
+
+
+def walk_arg(arg):
+    """Process arguments and build actions queue."""
+    if ( arg in PACKS['dirs'] ):
+        QUEUE.append(Packdir(arg))
+    elif ( arg in PACKS['packs'] ):
+        QUEUE.append(Package(arg))
+    else:
+        error('Pack or pack directory not found.')
+
+
+def parse_args():
+    """Parse arguments."""
+    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT
+    args = sys.argv[1:]
+
+    while ( args ):
+        if ( args[0] == '-nd' ):
+            DECO = False
+            del args[0]
+            continue
+        if ( args[0] == '-ps' ):
+            SHOW_SIZE = True
+            del args[0]
+            continue
+        if ( args[0] == '-no' ):
+            NO_OUTPUT = True
+            del args[0]
+            continue
+        if ( args[0] == '-na' ):
+            ASYNC = False
+            del args[0]
+            continue
+        break
+
+    if ( not args ):
+        print_help()
+
+    ACTION = args.pop(0)
+
+    if ( ACTION not in ACTIONS ):
+        print_help()
+
+    if ( ACTION == 'install' ):
+        INSTALL = True
+        parse_install(args)
+        return
+
+    if ( ACTION == 'git' ):
+        if ( not args ):
+            print_help()
+        GIT = args.pop(0)
+
+    # if no args beyond the command, perform on all packages, in all dirs
+    # otherwise perform on args (they could be single packages, or directories)
+    if ( not args ):
+        for path in glob.iglob(PACKS['vimdir'] + '/pack/*'):
+            walk_arg(os.path.basename(path))
+    else:
+        for arg in args:
+            walk_arg(arg)
+
+
+def parse_install(args):
+    """Parse arguments that follow an 'install' subcommand."""
+    global INSTDIR, INSTOPT
+
+    for arg in args:
+        if ( arg == 'opt' ):
+            INSTOPT = True
+
+        elif ( re.search('^dir=\w+', arg) ):
+            INSTDIR = arg.replace('dir=', '')
+
+        else:
+            QUEUE.append(arg)
+
+
+#------------------------------------------------------------------------------
+#   INSTALL QUEUE PROCESSING
+#------------------------------------------------------------------------------
+
+
+def repo_validate(arg):
+    """Make a dictionary with repo information."""
+    repo = {}
+    gh = 'https://github.com/'
+    gl = 'https://gitlab.com/'
+
+    try:
+        pack = arg.split('/')
+
+        if len(pack) == 2:
+            repo['user'], repo['name'] = pack
+            repo['address'] = gh + arg
+
+        elif len(pack) == 3:
+            site, repo['user'], repo['name'] = pack
+            if site == 'gh':
+                repo['address'] = (gh + repo['user'] + '/' + repo['name'])
+            elif site == 'gl':
+                repo['address'] = (gl + repo['user'] + '/' + repo['name'])
+
+        elif re.search('^https?://', arg):
+            repo['address'] = re.sub('(\.git)?/?$', '', arg)
+            repo['name'] = re.sub('.*/', '', repo['address'])
+            repo['user'] = re.match('.*/([^/]+)/', repo['address']).group(1)
+
+    finally:
+        return repo
+
+
+def clone_output(out):
+    if ( re.search('\nfatal:', out) ):
+        return re.sub('fatal:', color('red', 'fatal') + ':', out)
+    else:
+        return out
+
+
+def process_clones():
+    """Handle asynch package installation."""
+    while ( PROCESSING ):
+        i = 0
+        for repo in PROCESSING:
+            if repo['process'].poll() is not None:
+                out = repo['process'].communicate()[0].decode('utf-8')
+                name = color('green', repo['user'] + '/' + repo['name'])
+                log(name + ': ' + clone_output(out))
+                del PROCESSING[i]
+                i = 0
+                break
+            i += 1
+
+
+def install_packages():
+    """Process the install queue."""
+    pdir = Packdir(INSTDIR)
+    pdir.ensure_exists()
+    instdir = pdir.path + ('/opt' if INSTOPT else '/start')
+
+    for q in QUEUE:
+        repo = repo_validate(q)
+        if not repo:
+            continue
+
+        if not pdir.has(repo['name']):
+            pdir.install(repo)
+        else:
+            name = color('green', repo['user'] + '/' + repo['name'])
+            log(name + ': already installed')
+
+    process_clones()
+
+
+#------------------------------------------------------------------------------
+#   ACTION QUEUE PROCESSING
+#------------------------------------------------------------------------------
+
+
+def process_asynch(packdir=None, subdir=None):
+    """Handle asynch package processing."""
+    while ( PROCESSING ):
+        i = 0
+        for pack in PROCESSING:
+            if pack.process.poll() is not None:
+                cmd = pack.process.communicate()
+                cmd = [cmd[0].decode('utf-8'), cmd[1].decode('utf-8')]
+                if packdir:
+                    # output is managed by Packdir class
+                    packdir.output(pack.output(cmd), subdir)
+                else:
+                    # query for single packs, no Packdir calls
+                    log(pack.output(cmd))
+                del PROCESSING[i]
+                i = 0
+                break
+            i += 1
+
+
+def process_action():
+    """
+    Process the queue for the requested action.
+
+    Each element of the queue is either a packages directory, or a single
+    package. Their public methods' names are the same, so they can be called in
+    either case.
+    """
+    for q in QUEUE:
+        actions = {
+            'list': q.list,
+            'update': q.update,
+            'status': q.status,
+            'verbose': q.verbose,
+            'remotes': q.remotes,
+            'fetch': q.fetch,
+            'git': q.git,
+            'move2opt': q.move2opt,
+            'move2start': q.move2start
+        }
+        log ( actions[ACTION]() )
+
+    # packages may have been queued for async processing
+    process_asynch()
+
+
+#------------------------------------------------------------------------------
+#   MAIN QUEUE PROCESSING
+#------------------------------------------------------------------------------
+
+
+def main():
+    """Main function."""
+    find_packs()            # find packages and their directories
+    parse_args()            # build the action/installation queue
+    clear_screen()          # clear the screen if appropriate
+
+    if INSTALL:
+        install_packages()
+    else:
+        process_action()
+
+    if not NO_OUTPUT:       # leave an empty line at the end
+        print()
+
+
+if __name__ == '__main__':
+    main()
+
