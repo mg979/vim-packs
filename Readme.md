@@ -10,9 +10,18 @@ Put the python executable somewhere (preferably in your path), then you can run
 it from the terminal. Tested in Linux only (should work in mintty too).
 
 If you want tab completion, also source the optional shell script in your
-.bashrc.
+.bashrc:
 
     source path/to/vpacks.sh
+
+You could also use it to install it in the `pack` directory, so that it will
+update itself with the other plugins. First download the script, then run it:
+
+    ./vpacks install mg979/vim-packs
+
+You should then make a link to the executable in a directory in your path:
+
+    ln -s ~/.vim/pack/vpacks/start/vim-packs/vpacks ~/.local/bin/vpacks
 
 ## Options explained
 
@@ -41,6 +50,6 @@ The script recognizes the following formats for remote repos:
 
 Repositories are cloned with `--depth 1` (shallow clones) to save disk space.
 
-The default directory when installing is `pack/vpacks` (so for example
+The default directory when installing is `vpacks` (so for example
 `~/.vim/pack/vpacks/start/plugin-name`), you can specify a different directory
 with the `dir=` option.
