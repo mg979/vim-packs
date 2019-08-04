@@ -40,3 +40,7 @@ The script recognizes the following formats for remote repos:
 - *http(s)://...*: any repo
 
 Repositories are cloned with `--depth 1` (shallow clones) to save disk space.
+
+The default directory when installing is `pack/vpacks` (so for example
+`~/.vim/pack/vpacks/start/plugin-name`), you can specify a different directory
+with the `dir=` option.

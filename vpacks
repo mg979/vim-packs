@@ -128,9 +128,9 @@ class Package():
                 if not line:
                     continue
                 if not mod:
-                    mod = line[0] == 'M'
+                    mod = 'M' in line[:2]
                 if not unt:
-                    unt = line[0] == '?'
+                    unt = '?' in line[:2]
             sig = 'M?' if (mod and unt) else ' M' if mod else ' ?'
             log(fmt % (color('cyan', self.name), color('red', sig), size))
         else:
@@ -148,7 +148,7 @@ class Package():
         if cmd[1]:
             return name + ': ' + color('red', cmd[1])
         elif cmd[0]:
-            mod, rest = cmd[0][:1], cmd[0][2:]
+            mod, rest = cmd[0][:2], cmd[0][2:]
             return '\n' + name + ':\n' + color('red', mod) + rest
         return ''
 
