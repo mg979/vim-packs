@@ -148,8 +148,9 @@ class Package():
         if cmd[1]:
             return name + ': ' + color('red', cmd[1])
         elif cmd[0]:
-            mod, rest = cmd[0][:2], cmd[0][2:]
-            return '\n' + name + ':\n' + color('red', mod) + rest
+            lines = [(color('red', line[:2]) + line[2:])
+                     for line in cmd[0].splitlines()]
+            return '\n' + name + ':\n' + '\n'.join(lines) + '\n'
         return ''
 
     def verbose(self):
