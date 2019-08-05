@@ -36,6 +36,8 @@ COLORS = {
     'cyan':        '\33[96m',
 }
 
+UP_TO_DATE = re.compile('Already up-to-date.')
+
 #------------------------------------------------------------------------------
 # Package class
 #------------------------------------------------------------------------------
@@ -88,25 +90,43 @@ class Package():
             c = cmd[0].replace('nothing to commit, working tree clean\n', '')
             return name + c
 
-    def output(self, cmd):
-        name = "%-20s" % (self.name + ': ')
-        if cmd[1]:
-            if ( cmd[1][:5] == 'fatal' ):
+    def output(self, cmd, updating=False):
+        """Merge stdout and stderr if updating packages, otherwise prioritize
+        stderr. Return an empty string if no output at all."""
+        name = "%-30s" % (self.name + ': ')
+        out, err = cmd
+
+        if err:
+            if ( err[:5] == 'fatal' ):
                 fatal = color('red', 'fatal')
-                rest = re.sub('\..*', '.', cmd[1].split('\n')[0][5:])
+                rest = re.sub('\..*', '.', err.split('\n')[0][5:])
                 return name + fatal + rest + '\n'
+            elif updating and re.search('http', err.splitlines()[0]):
+                err += '\n'
             else:
-                error = color('red', cmd[1].split('\n')[0])
-                return name + error + '\n'
-        elif cmd[0]:
+                err = color('red', err.split('\n')[0])
+                return name + err + '\n'
+
+        if out:
+            ok = False
+
             if ACTION == 'fetch':
-                c = cmd[0].replace('Fetching ', '').split('\n')
-                c = 'Fetching ' + ', '.join(c[:-1]) + '\n'
+                out = out.replace('Fetching ', '').split('\n')
+                out = 'Fetching ' + ', '.join(out[:-1]) + '\n'
             elif ACTION == 'remotes':
-                c = ', '.join(reversed(cmd[0].splitlines())) + '\n'
+                out = ', '.join(reversed(out.splitlines())) + '\n'
             else:
-                c = cmd[0].replace('Already up-to-date.', color('green', 'ok'))
-            return name + c
+                if re.search(UP_TO_DATE, out):
+                    out = color('green', 'ok') + '\n'
+                    ok = True
+            if updating:
+                if not ok:
+                    name = '\n' + color('cyan', name, bold=True)
+                return name + out + err
+            else:
+                return name + out
+
+        # neither stdout nor stderr
         return ''
 
     #--------------------------------------------------------------------------
@@ -622,6 +642,7 @@ def install_packages():
 
 def process_asynch(packdir=None, subdir=None):
     """Handle asynch package processing."""
+    update = ACTION == 'update'
     while ( PROCESSING ):
         i = 0
         for pack in PROCESSING:
@@ -630,12 +651,11 @@ def process_asynch(packdir=None, subdir=None):
                 cmd = [cmd[0].decode('utf-8'), cmd[1].decode('utf-8')]
                 if packdir:
                     # output is managed by Packdir class
-                    packdir.output(pack.output(cmd), subdir)
+                    packdir.output(pack.output(cmd, updating=update), subdir)
                 else:
                     # query for single packs, no Packdir calls
-                    log(pack.output(cmd))
+                    log(pack.output(cmd, updating=update))
                 del PROCESSING[i]
-                i = 0
                 break
             i += 1
 
