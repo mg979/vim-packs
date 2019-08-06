@@ -11,15 +11,15 @@ if os.name == 'nt':
     print("Please use mintty in Windows")
     sys.exit()
 
-HAS_OUTPUT = False
 PACKS, WARNINGS = {}, []
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
             'move2opt', 'move2start', 'install', 'remotes' ]
 PROCESSING, QUEUE, ACTION, DECO, COLOR = [], [], '', True, True
 
-SHOW_SIZE, NO_OUTPUT, ASYNC = False, False, True
+SHOW_SIZE, NO_OUTPUT, HAS_OUTPUT, ASYNC = False, False, False, True
 
 INSTDIR, INSTOPT, INSTALL = 'vpacks', False, False
+OPT_ONLY, START_ONLY = False, False
 
 COLORS = {
     'darkred':     '\33[31m',
@@ -139,10 +139,10 @@ class Package():
     def list(self, show_size=None):
         cmd = self.shell('git status --porcelain')
         left = "%-40s " if COLOR else "%-31s"
-        fmt = left + "%-5s %10s"
+        fmt = left + "%-5s %10s\n"
         size = self.size() if (show_size is None and SHOW_SIZE) else ''
         if cmd[1]:
-            log(fmt % (color('red', self.name), color('red', 'ER'), size))
+            vals = (color('red', self.name), color('red', 'ER'), size)
         elif cmd[0]:
             mod, unt = False, False
             for line in cmd[0].split('\n'):
@@ -153,9 +153,11 @@ class Package():
                 if not unt:
                     unt = '?' in line[:2]
             sig = 'M?' if (mod and unt) else ' M' if mod else ' ?'
-            log(fmt % (color('cyan', self.name), color('red', sig), size))
+            vals = (color('cyan', self.name), color('red', sig), size)
         else:
-            log("%-31s %-5s %10s" % (self.name, color('green', 'ok'), size))
+            fmt = "%-31s %-5s %10s\n"
+            vals = (self.name, color('green', 'ok'), size)
+        return fmt % vals
 
     def update(self):
         self.process = self.async_shell('git pull --ff-only')
@@ -270,6 +272,10 @@ class Packdir():
             log("─" * 67 + "\n")
 
     def walk(self, subdir):
+        if ( OPT_ONLY and subdir == 'start' ):
+            return []
+        if ( START_ONLY and subdir == 'opt' ):
+            return []
         if ( os.path.exists(self.path + '/' + subdir) ):
             return glob.iglob(self.path + '/' + subdir + '/*')
         return []
@@ -278,10 +284,10 @@ class Packdir():
         """Print the header only if there's some package to display."""
         if ( NO_OUTPUT or not output ):
             return
-        if ( not self.has_output_opt and subdir == 'opt' ):
+        if ( not self.has_output_opt and subdir == 'opt' and not START_ONLY ):
             self.has_output_opt = True
             self.header(self.path + '/opt')
-        if ( not self.has_output_start and subdir == 'start' ):
+        if ( not self.has_output_start and subdir == 'start' and not OPT_ONLY ):
             self.has_output_start = True
             self.header(self.path + '/start')
         log(output, end='')
@@ -304,12 +310,10 @@ class Packdir():
     #--------------------------------------------------------------------------
 
     def list(self, show_size=None):
-        self.header(self.path + '/opt')
         for p in self.walk('opt'):
-            Package(os.path.basename(p)).list(show_size)
-        self.header(self.path + '/start')
+            self.output(Package(os.path.basename(p)).list(show_size), 'opt')
         for p in self.walk('start'):
-            Package(os.path.basename(p)).list(show_size)
+            self.output(Package(os.path.basename(p)).list(show_size), 'start')
 
     def update(self):
         for p in self.walk('opt'):
@@ -395,6 +399,8 @@ def print_help():
         ['-ps',  'print size for "list" subcommand'],
         ['-no',  'no output (for use inside scripts)'],
         ['-na',  'no async update/cloning'],
+        ['-opt',  'command only considers opt packages'],
+        ['-start',  'command only considers start packages'],
     ]
 
     instopts = [
@@ -529,7 +535,7 @@ def walk_arg(arg):
 def parse_args():
     """Parse arguments."""
     global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT, COLOR
-    global TERMINAL
+    global TERMINAL, OPT_ONLY, START_ONLY
     args = sys.argv[1:]
 
     while ( args ):
@@ -553,6 +559,15 @@ def parse_args():
             ASYNC = False
             del args[0]
             continue
+        if ( args[0] == '-opt' ):
+            OPT_ONLY = True
+            del args[0]
+            continue
+        if ( args[0] == '-start' ):
+            START_ONLY = True
+            del args[0]
+            continue
+        # exit loop when the first arg is found, that isn't an option
         break
 
     if ( not args ):
