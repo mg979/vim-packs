@@ -12,7 +12,7 @@ if os.name == 'nt':
     sys.exit()
 
 HAS_OUTPUT = False
-PACKS = {}
+PACKS, WARNINGS = {}, []
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
             'move2opt', 'move2start', 'install', 'remotes' ]
 PROCESSING, QUEUE, ACTION, DECO, COLOR = [], [], '', True, True
@@ -479,15 +479,36 @@ def confirm(string):
     return sys.stdin.read(1) == 'y'
 
 
+def warning(msg, pack):
+    """Issue a warning related to some package."""
+    if NO_OUTPUT:
+        return True
+    log(color('red', 'Warning') + ': ' + msg + ' (' + pack + ')')
+
+
 def find_packs():
     """Find vim and package directories and basenames."""
+    global WARNINGS
     win = os.path.expanduser('~\\vimfiles')
     nwin = os.path.expanduser('~/.vim')
     PACKS['vimdir'] = win if os.path.exists(win) else nwin
     dirpaths = glob.glob(PACKS['vimdir'] + '/pack/*')
     PACKS['dirs'] = {os.path.basename(folder): folder for folder in dirpaths}
     packpaths = glob.glob(PACKS['vimdir'] + '/pack/*/*/*')
-    PACKS['packs'] = {os.path.basename(pack): pack for pack in packpaths}
+    PACKS['packs'] = {}
+
+    for packpath in packpaths:
+        key = os.path.basename(packpath)
+        if key in PACKS['packs']:
+            WARNINGS.append(('duplicated package', key))
+        else:
+            PACKS['packs'][key] = packpath
+
+    for dir in PACKS['dirs']:
+        for pack in PACKS['packs']:
+            if pack == dir:
+                msg = 'a package with the same name of a directory exists'
+                WARNINGS.append((msg, pack))
 
 
 #------------------------------------------------------------------------------
@@ -604,6 +625,8 @@ def repo_validate(arg):
                 repo['address'] = (gh + repo['user'] + '/' + repo['name'])
             elif site == 'gl':
                 repo['address'] = (gl + repo['user'] + '/' + repo['name'])
+            else:
+                return {}
 
         elif re.search('^https?://', arg):
             repo['address'] = re.sub('(\.git)?/?$', '', arg)
@@ -631,7 +654,6 @@ def process_clones():
                 name = color('green', repo['user'] + '/' + repo['name'])
                 log(name + ': ' + clone_output(out))
                 del PROCESSING[i]
-                i = 0
                 break
             i += 1
 
@@ -725,6 +747,9 @@ def main():
 
     if not NO_OUTPUT:       # leave an empty line at the end
         print()
+                
+    for msg in WARNINGS:
+        warning(msg[0], msg[1])
 
 
 if __name__ == '__main__':
