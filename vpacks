@@ -15,7 +15,7 @@ HAS_OUTPUT = False
 PACKS = {}
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
             'move2opt', 'move2start', 'install', 'remotes' ]
-PROCESSING, QUEUE, ACTION, DECO = [], [], '', True
+PROCESSING, QUEUE, ACTION, DECO, COLOR = [], [], '', True, True
 
 SHOW_SIZE, NO_OUTPUT, ASYNC = False, False, True
 
@@ -138,10 +138,8 @@ class Package():
 
     def list(self, show_size=None):
         cmd = self.shell('git status --porcelain')
-        if not DECO:
-            log(self.name)
-            return
-        fmt = "%-35s %-5s %10s"
+        left = "%-40s " if COLOR else "%-31s"
+        fmt = left + "%-5s %10s"
         size = self.size() if (show_size is None and SHOW_SIZE) else ''
         if cmd[1]:
             log(fmt % (color('red', self.name), color('red', 'ER'), size))
@@ -157,7 +155,7 @@ class Package():
             sig = 'M?' if (mod and unt) else ' M' if mod else ' ?'
             log(fmt % (color('cyan', self.name), color('red', sig), size))
         else:
-            log("%-26s %-5s %10s" % (self.name, color('green', 'ok'), size))
+            log("%-31s %-5s %10s" % (self.name, color('green', 'ok'), size))
 
     def update(self):
         self.process = self.async_shell('git pull --ff-only')
@@ -177,15 +175,17 @@ class Package():
         return ''
 
     def verbose(self):
+        color = ' -c color.ui=always ' if COLOR else ' '
         return self.verbose_output(
-            self.shell('git -c color.ui=always status -vv'))
+            self.shell('git' + color + 'status -vv'))
 
     def remotes(self):
         return self.output(self.shell('git remote'))
 
     def git(self):
+        color = ' -c color.ui=always ' if COLOR else ' '
         return self.verbose_output(
-            self.shell('git -c color.ui=always ' + GIT), nl=True)
+            self.shell('git' + color + GIT), nl=True)
 
     def fetch(self):
         self.process = self.async_shell('git fetch --all')
@@ -259,10 +259,15 @@ class Packdir():
     def header(self, path):
         if ( not DECO or not os.path.exists(path) or not os.listdir(path) ):
             return
-        blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
-        log("\n" + blue + "─" * 67 + end)
-        log(bold + blue + "Packs in directory " + yelw + path + "/" + end)
-        log(blue + "─" * 67 + end + "\n")
+        if COLOR:
+            blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
+            log("\n" + blue + "─" * 67 + end)
+            log(bold + blue + "Packs in directory " + yelw + path + "/" + end)
+            log(blue + "─" * 67 + end + "\n")
+        else:
+            log("\n" + "─" * 67)
+            log("Packs in directory " + path + "/")
+            log("─" * 67 + "\n")
 
     def walk(self, subdir):
         if ( os.path.exists(self.path + '/' + subdir) ):
@@ -386,6 +391,7 @@ def print_help():
 
     options = [
         ['-nd',  'no decorations (color, headers)'],
+        ['-nc',  'no color'],
         ['-ps',  'print size for "list" subcommand'],
         ['-no',  'no output (for use inside scripts)'],
         ['-na',  'no async update/cloning'],
@@ -445,7 +451,7 @@ def error(string):
 
 def color(color, string, bold=False, line=False):
     """Print a colored string."""
-    if NO_OUTPUT or not DECO:
+    if not COLOR:
         return string
     b = '\033[1m' if bold else ''
     l = '\033[4m' if line else ''
@@ -460,7 +466,7 @@ def log(string, end='\n'):
 
 def clear_screen():
     """Clear the terminal window."""
-    if NO_OUTPUT or ACTION in ['git']:
+    if not TERMINAL or NO_OUTPUT or ACTION in ['git']:
         return
     os.system('clear')
 
@@ -501,12 +507,17 @@ def walk_arg(arg):
 
 def parse_args():
     """Parse arguments."""
-    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT
+    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT, COLOR
+    global TERMINAL
     args = sys.argv[1:]
 
     while ( args ):
         if ( args[0] == '-nd' ):
             DECO = False
+            del args[0]
+            continue
+        if ( args[0] == '-nc' ):
+            COLOR = False
             del args[0]
             continue
         if ( args[0] == '-ps' ):
@@ -540,6 +551,9 @@ def parse_args():
         if ( not args ):
             print_help()
         GIT = args.pop(0)
+
+    COLOR = not NO_OUTPUT and COLOR and DECO
+    TERMINAL = sys.stdout.isatty()
 
     # if no args beyond the command, perform on all packages, in all dirs
     # otherwise perform on args (they could be single packages, or directories)
