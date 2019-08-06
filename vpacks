@@ -93,6 +93,9 @@ class Package():
     def output(self, cmd, updating=False):
         """Merge stdout and stderr if updating packages, otherwise prioritize
         stderr. Return an empty string if no output at all."""
+        if NO_OUTPUT:
+            return ''
+
         name = "%-30s" % (self.name + ': ')
         out, err = cmd
 
@@ -190,7 +193,7 @@ class Package():
         if not ASYNC:
             self.process.wait()
 
-    def move2opt(self):
+    def move2opt(self, silent=False):
         name = color('green', self.name)
         pdir = self.packdir()
         if self.is_opt():
@@ -199,9 +202,10 @@ class Package():
             log("Moving " + name + " to /opt")
             subprocess.run(['mv', self.path, pdir + '/opt'])
             PACKS['packs'][self.name] = pdir + '/opt/' + self.name
-        Packdir(os.path.basename(pdir)).list(show_size=False)
+        if not NO_OUTPUT and not silent:
+            Packdir(os.path.basename(pdir)).list(show_size=False)
 
-    def move2start(self):
+    def move2start(self, silent=False):
         name = color('green', self.name)
         pdir = self.packdir()
         if self.is_start():
@@ -210,7 +214,8 @@ class Package():
             log("Moving " + name + " to /start")
             subprocess.run(['mv', self.path, pdir + '/start'])
             PACKS['packs'][self.name] = pdir + '/start/' + self.name
-        Packdir(os.path.basename(pdir)).list(show_size=False)
+        if not NO_OUTPUT and not silent:
+            Packdir(os.path.basename(pdir)).list(show_size=False)
 
 
 #------------------------------------------------------------------------------
@@ -266,7 +271,7 @@ class Packdir():
 
     def output(self, output, subdir):
         """Print the header only if there's some package to display."""
-        if ( not output ):
+        if ( NO_OUTPUT or not output ):
             return
         if ( not self.has_output_opt and subdir == 'opt' ):
             self.has_output_opt = True
@@ -347,7 +352,8 @@ class Packdir():
         if confirm("Move all packages in " + start + "\n%21s" % "to " + opt):
             os.makedirs(opt, exist_ok=True)
             for p in self.walk('start'):
-                Package(os.path.basename(p)).move2opt()
+                Package(os.path.basename(p)).move2opt(silent=True)
+            self.list(show_size=False)
 
     def move2start(self):
         opt = color('green', self.path + '/opt/')
@@ -355,7 +361,8 @@ class Packdir():
         if confirm("Move all packages in " + opt + "\n%21s" % "to " + start):
             os.makedirs(start, exist_ok=True)
             for p in self.walk('opt'):
-                Package(os.path.basename(p)).move2start()
+                Package(os.path.basename(p)).move2start(silent=True)
+            self.list(show_size=False)
 
 #------------------------------------------------------------------------------
 # HELP
@@ -438,7 +445,7 @@ def error(string):
 
 def color(color, string, bold=False, line=False):
     """Print a colored string."""
-    if not DECO:
+    if NO_OUTPUT or not DECO:
         return string
     b = '\033[1m' if bold else ''
     l = '\033[4m' if line else ''
