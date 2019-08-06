@@ -559,6 +559,8 @@ def parse_args():
         print_help()
 
     ACTION = args.pop(0)
+    TERMINAL = sys.stdout.isatty()
+    COLOR = not NO_OUTPUT and COLOR and DECO
 
     if ( ACTION not in ACTIONS ):
         print_help()
@@ -573,8 +575,6 @@ def parse_args():
             print_help()
         GIT = args.pop(0)
 
-    COLOR = not NO_OUTPUT and COLOR and DECO
-    TERMINAL = sys.stdout.isatty()
 
     # if no args beyond the command, perform on all packages, in all dirs
     # otherwise perform on args (they could be single packages, or directories)
