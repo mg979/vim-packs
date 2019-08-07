@@ -11,15 +11,31 @@ if os.name == 'nt':
     print("Please use mintty in Windows")
     sys.exit()
 
-PACKS, WARNINGS = {}, []
+
+#------------------------------------------------------------------------------
+# Global variables
+#------------------------------------------------------------------------------
+
+
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
             'move2opt', 'move2start', 'install', 'remotes' ]
-PROCESSING, QUEUE, ACTION, DECO, COLOR = [], [], '', True, True
 
-SHOW_SIZE, NO_OUTPUT, HAS_OUTPUT, ASYNC = False, False, False, True
-
-INSTDIR, INSTOPT, INSTALL = 'vpacks', False, False
-OPT_ONLY, START_ONLY = False, False
+ACTION     = ''
+ASYNC      = True
+COLOR      = True
+DECO       = True
+HAS_OUTPUT = False
+INSTALL    = False
+INSTDIR    = 'vpacks'
+INSTOPT    = False
+NO_OUTPUT  = False
+ONLY_OPT   = False
+ONLY_START = False
+PACKS      = {}
+PROCESSING = []
+QUEUE      = []
+SHOW_SIZE  = False
+WARNINGS   = []
 
 COLORS = {
     'darkred':     '\33[31m',
@@ -37,6 +53,7 @@ COLORS = {
 }
 
 UP_TO_DATE = re.compile('Already up-to-date.')
+
 
 #------------------------------------------------------------------------------
 # Package class
@@ -272,9 +289,9 @@ class Packdir():
             log("─" * 67 + "\n")
 
     def walk(self, subdir):
-        if ( OPT_ONLY and subdir == 'start' ):
+        if ( ONLY_OPT and subdir == 'start' ):
             return []
-        if ( START_ONLY and subdir == 'opt' ):
+        if ( ONLY_START and subdir == 'opt' ):
             return []
         if ( os.path.exists(self.path + '/' + subdir) ):
             return glob.iglob(self.path + '/' + subdir + '/*')
@@ -284,10 +301,10 @@ class Packdir():
         """Print the header only if there's some package to display."""
         if ( NO_OUTPUT or not output ):
             return
-        if ( not self.has_output_opt and subdir == 'opt' and not START_ONLY ):
+        if ( not self.has_output_opt and subdir=='opt' and not ONLY_START ):
             self.has_output_opt = True
             self.header(self.path + '/opt')
-        if ( not self.has_output_start and subdir == 'start' and not OPT_ONLY ):
+        if ( not self.has_output_start and subdir=='start' and not ONLY_OPT ):
             self.has_output_start = True
             self.header(self.path + '/start')
         log(output, end='')
@@ -535,7 +552,7 @@ def walk_arg(arg):
 def parse_args():
     """Parse arguments."""
     global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT, COLOR
-    global TERMINAL, OPT_ONLY, START_ONLY
+    global TERMINAL, ONLY_START, ONLY_OPT
     args = sys.argv[1:]
 
     while ( args ):
@@ -560,11 +577,11 @@ def parse_args():
             del args[0]
             continue
         if ( args[0] == '-opt' ):
-            OPT_ONLY = True
+            ONLY_OPT = True
             del args[0]
             continue
         if ( args[0] == '-start' ):
-            START_ONLY = True
+            ONLY_START = True
             del args[0]
             continue
         # exit loop when the first arg is found, that isn't an option
