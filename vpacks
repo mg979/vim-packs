@@ -7,11 +7,6 @@ import subprocess
 import sys
 from shutil import which
 
-if os.name == 'nt':
-    print("Please use mintty in Windows")
-    sys.exit()
-
-
 #------------------------------------------------------------------------------
 # Global variables
 #------------------------------------------------------------------------------
@@ -62,9 +57,12 @@ UP_TO_DATE = re.compile('Already up-to-date.')
 
 class Package():
     """Class for vim packages."""
-    def __init__(self, name, path=None):
+    def __init__(self, name, pdir=None):
         self.name = name
-        self.path = PACKS['packs'][self.name] if not path else path
+        if pdir:
+            self.path = PACKS['dirs'][pdir] + '/' + name
+        else:
+            self.path = PACKS['packs'][name]
         self.is_package, self.process = True, None
 
     #--------------------------------------------------------------------------
@@ -244,9 +242,12 @@ class Package():
 
 class Packdir():
     """Class for base package directories."""
-    def __init__(self, name, path=None):
+    def __init__(self, name):
         self.name = name
-        self.path = PACKS['dirs'][self.name] if not path else path
+        if name in PACKS['dirs']:
+            self.path = PACKS['dirs'][name]
+        else:
+            self.path = PACKS['dirs'][name] = PACKS['vimdir'] + '/pack/' + name
         self.is_package = False
         self.has_output_opt = False
         self.has_output_start = False
@@ -255,14 +256,10 @@ class Packdir():
     # class helpers: specific to this class
     #--------------------------------------------------------------------------
 
-    def is_valid(self):
-        return os.path.exists(self.path)
-
     def ensure_exists(self):
-        if ( not self.is_valid() ):
+        if ( not os.path.exists(self.path) ):
             os.makedirs(self.path + '/opt')
             os.makedirs(self.path + '/start')
-            PACKS['dirs'][self.name] = PACKS['vimdir'] + '/pack/' + self.path
 
     def has(self, pack, in_opt=False, in_start=False):
         """Check if package is contained in this packdir."""
@@ -779,7 +776,7 @@ def main():
 
     if not NO_OUTPUT:       # leave an empty line at the end
         print()
-                
+
     for msg in WARNINGS:
         warning(msg[0], msg[1])
 
