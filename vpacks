@@ -762,11 +762,15 @@ def install_packages():
         if not repo.validate():
             continue
 
-        if not pdir.has(repo.name):
+        if repo.name in PACKS['packs']:
+            name = color('green', repo.user + '/' + repo.name)
+            dr = PACKS['packs'][repo.name].replace(PACKS['vimdir'], '')
+            log(name + ': already installed in ..' + dr)
+        elif not pdir.has(repo.name):
             pdir.install(repo)
         else:
             name = color('green', repo.user + '/' + repo.name)
-            log(name + ': already installed')
+            log(name + ': already installed in ' + pdir.path)
 
     process_clones()
 
