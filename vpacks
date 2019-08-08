@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from shutil import which
+from time import sleep,time
 
 #------------------------------------------------------------------------------
 # Global variables
@@ -30,6 +31,7 @@ PACKS           = {}
 PROCESSING      = []
 QUEUE           = []
 SHOW_SIZE       = False
+TIMEOUT         = 15
 WARNINGS        = []
 
 COLORS = {
@@ -64,6 +66,7 @@ class Package():
         else:
             self.path = PACKS['packs'][name]
         self.is_package, self.process = True, None
+        self.timeout = TIMEOUT
 
     #--------------------------------------------------------------------------
     # class helpers: specific to this class
@@ -178,7 +181,7 @@ class Package():
         self.process = self.async_shell('git pull --ff-only')
         PROCESSING.append(self)
         if not ASYNC:
-            self.process.wait()
+            wait(self)
 
     def status(self):
         cmd = self.shell('git status --porcelain')
@@ -208,7 +211,7 @@ class Package():
         self.process = self.async_shell('git fetch --all')
         PROCESSING.append(self)
         if not ASYNC:
-            self.process.wait()
+            wait(self)
 
     def move2opt(self, silent=False):
         name = color('green', self.name)
@@ -317,7 +320,7 @@ class Packdir():
             )
             PROCESSING.append(repo)
             if not ASYNC:
-                repo.process.wait()
+                wait(repo)
 
     #--------------------------------------------------------------------------
     # class commands: methods names have their correspective in Package class
@@ -459,6 +462,8 @@ def print_help():
         ['-ps',         'print size for "list" subcommand'],
         ['-no',         'no output (for use inside scripts)'],
         ['-na',         'no async update/cloning'],
+        ['-time',       'timeout for operations (default 15s)'],
+        ['-notime',     'no timeout'],
         ['-opt',        'command only considers opt packages'],
         ['-start',      'command only considers start packages'],
     ]
@@ -577,6 +582,19 @@ def find_packs():
                 WARNINGS.append((msg, pack))
 
 
+def wait(pack):
+    """Wait for process to terminate, handle TimeoutError."""
+    try:
+        pack.process.wait(timeout=TIMEOUT)
+    except TimeoutError:
+        timeout(pack.name)
+
+
+def timeout(name):
+    """Log warning when timeout has been reached."""
+    log("%-30s" % (name + ': ') + color('red', "timeout %ds" % int(TIMEOUT)))
+
+
 #------------------------------------------------------------------------------
 # COMMAND-LINE ARGUMENTS PARSING
 #------------------------------------------------------------------------------
@@ -595,7 +613,7 @@ def walk_arg(arg):
 def parse_args():
     """Parse arguments."""
     global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT, COLOR
-    global TERMINAL, ONLY_START, ONLY_OPT
+    global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT
     args = sys.argv[1:]
 
     while ( args ):
@@ -617,6 +635,19 @@ def parse_args():
             continue
         if ( args[0] == '-na' ):
             ASYNC = False
+            if TIMEOUT and TIMEOUT == 15:
+                TIMEOUT = 20
+            del args[0]
+            continue
+        if ( args[0] == '-time' ):
+            del args[0]
+            if ( args ):
+                TIMEOUT = int(args.pop(0))
+                continue
+            else:
+                print_help()
+        if ( args[0] == '-notime' ):
+            TIMEOUT = None
             del args[0]
             continue
         if ( args[0] == '-opt' ):
@@ -690,16 +721,34 @@ def clone_output(out):
 
 def process_clones():
     """Handle asynch package installation."""
+    start = time()
     while ( PROCESSING ):
         i = 0
+
+        # --------------------
+
         for repo in PROCESSING:
+            if TIMEOUT and repo.timeout < 0:
+                timeout(repo.name)
+                repo.process.terminate()
+                del PROCESSING[i]
+                break
             if repo.process.poll() is not None:
                 out = repo.process.communicate()[0].decode('utf-8')
                 name = color('green', repo.user + '/' + repo.name)
                 log(name + ': ' + clone_output(out))
                 del PROCESSING[i]
                 break
+            if TIMEOUT:
+                passed = time() - start
+                repo.timeout -= passed
+                start += passed
             i += 1
+
+        # --------------------
+
+        if ( PROCESSING ):
+            sleep(0.2)
 
 
 def install_packages():
@@ -730,9 +779,18 @@ def install_packages():
 def process_asynch(packdir=None, subdir=None):
     """Handle asynch package processing."""
     update = ACTION == 'update'
+    start = time()
     while ( PROCESSING ):
         i = 0
+
+        # --------------------
+
         for pack in PROCESSING:
+            if TIMEOUT and pack.timeout < 0:
+                timeout(pack.name)
+                pack.process.terminate()
+                del PROCESSING[i]
+                break
             if pack.process.poll() is not None:
                 cmd = pack.process.communicate()
                 cmd = [cmd[0].decode('utf-8'), cmd[1].decode('utf-8')]
@@ -744,7 +802,16 @@ def process_asynch(packdir=None, subdir=None):
                     log(pack.output(cmd, updating=update))
                 del PROCESSING[i]
                 break
+            if TIMEOUT:
+                passed = time() - start
+                pack.timeout -= passed
+                start += passed
             i += 1
+
+        # --------------------
+
+        if ( PROCESSING ):
+            sleep(0.2)
 
 
 def process_action():
