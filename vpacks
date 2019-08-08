@@ -15,22 +15,22 @@ from shutil import which
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
             'move2opt', 'move2start', 'install', 'remotes' ]
 
-ACTION     = ''
-ASYNC      = True
-COLOR      = True
-DECO       = True
-HAS_OUTPUT = False
-INSTALL    = False
-INSTDIR    = 'vpacks'
-INSTOPT    = False
-NO_OUTPUT  = False
-ONLY_OPT   = False
-ONLY_START = False
-PACKS      = {}
-PROCESSING = []
-QUEUE      = []
-SHOW_SIZE  = False
-WARNINGS   = []
+ACTION          = ''
+ASYNC           = True
+COLOR           = True
+DECO            = True
+HAS_OUTPUT      = False
+INSTALL         = False
+INSTDIR         = 'vpacks'
+INSTOPT         = False
+NO_OUTPUT       = False
+ONLY_OPT        = False
+ONLY_START      = False
+PACKS           = {}
+PROCESSING      = []
+QUEUE           = []
+SHOW_SIZE       = False
+WARNINGS        = []
 
 COLORS = {
     'darkred':     '\33[31m',
@@ -307,17 +307,17 @@ class Packdir():
         log(output, end='')
 
     def install(self, repo):
-        if not self.has(repo['name']):
-            repo['process'] = subprocess.Popen(
+        if not self.has(repo.name):
+            repo.process = subprocess.Popen(
                 ['git', 'clone', '--depth', '1',
-                 '--shallow-submodules', repo['address']],
+                 '--shallow-submodules', repo.address],
                 cwd=self.path + ('/opt' if INSTOPT else '/start'),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
             )
             PROCESSING.append(repo)
             if not ASYNC:
-                repo['process'].wait()
+                repo.process.wait()
 
     #--------------------------------------------------------------------------
     # class commands: methods names have their correspective in Package class
@@ -387,6 +387,52 @@ class Packdir():
                 Package(os.path.basename(p)).move2start(silent=True)
             self.list(show_size=False)
 
+
+#------------------------------------------------------------------------------
+# Repository class
+#------------------------------------------------------------------------------
+
+
+class Repo():
+    """Class for remote repositories."""
+    def __init__(self, arg):
+        self.arg = arg
+        self.name = None
+        self.user = None
+        self.address = None
+        self.process = None
+        self.timeout = TIMEOUT
+
+    def validate(self):
+        """Fill repo information. If repo is valid, return success."""
+        gh = 'https://github.com/'
+        gl = 'https://gitlab.com/'
+
+        try:
+            pack = self.arg.split('/')
+
+            if len(pack) == 2:
+                self.user, self.name = pack
+                self.address = gh + self.arg
+
+            elif len(pack) == 3:
+                site, self.user, self.name = pack
+                if site == 'gh':
+                    self.address = (gh + self.user + '/' + self.name)
+                elif site == 'gl':
+                    self.address = (gl + self.user + '/' + self.name)
+                else:
+                    return False
+
+            elif re.search('^https?://', self.arg):
+                self.address = re.sub('(\.git)?/?$', '', self.arg)
+                self.name = re.sub('.*/', '', self.address)
+                self.user = re.match('.*/([^/]+)/', self.address).group(1)
+        except:
+            return False
+        return True
+
+
 #------------------------------------------------------------------------------
 # HELP
 #------------------------------------------------------------------------------
@@ -408,18 +454,18 @@ def print_help():
     ]
 
     options = [
-        ['-nd',  'no decorations (color, headers)'],
-        ['-nc',  'no color'],
-        ['-ps',  'print size for "list" subcommand'],
-        ['-no',  'no output (for use inside scripts)'],
-        ['-na',  'no async update/cloning'],
-        ['-opt',  'command only considers opt packages'],
-        ['-start',  'command only considers start packages'],
+        ['-nd',         'no decorations (color, headers)'],
+        ['-nc',         'no color'],
+        ['-ps',         'print size for "list" subcommand'],
+        ['-no',         'no output (for use inside scripts)'],
+        ['-na',         'no async update/cloning'],
+        ['-opt',        'command only considers opt packages'],
+        ['-start',      'command only considers start packages'],
     ]
 
     instopts = [
-        ['opt',     'install in /opt directory rather than in /start'],
-        ['dir=DIR', 'set base installation directory for packages'],
+        ['opt',         'install in /opt directory rather than in /start'],
+        ['dir=DIR',     'set base installation directory for packages'],
     ]
 
     examples = [
@@ -635,37 +681,6 @@ def parse_install(args):
 #------------------------------------------------------------------------------
 
 
-def repo_validate(arg):
-    """Make a dictionary with repo information."""
-    repo = {}
-    gh = 'https://github.com/'
-    gl = 'https://gitlab.com/'
-
-    try:
-        pack = arg.split('/')
-
-        if len(pack) == 2:
-            repo['user'], repo['name'] = pack
-            repo['address'] = gh + arg
-
-        elif len(pack) == 3:
-            site, repo['user'], repo['name'] = pack
-            if site == 'gh':
-                repo['address'] = (gh + repo['user'] + '/' + repo['name'])
-            elif site == 'gl':
-                repo['address'] = (gl + repo['user'] + '/' + repo['name'])
-            else:
-                return {}
-
-        elif re.search('^https?://', arg):
-            repo['address'] = re.sub('(\.git)?/?$', '', arg)
-            repo['name'] = re.sub('.*/', '', repo['address'])
-            repo['user'] = re.match('.*/([^/]+)/', repo['address']).group(1)
-
-    finally:
-        return repo
-
-
 def clone_output(out):
     if ( re.search('\nfatal:', out) ):
         return re.sub('fatal:', color('red', 'fatal') + ':', out)
@@ -678,9 +693,9 @@ def process_clones():
     while ( PROCESSING ):
         i = 0
         for repo in PROCESSING:
-            if repo['process'].poll() is not None:
-                out = repo['process'].communicate()[0].decode('utf-8')
-                name = color('green', repo['user'] + '/' + repo['name'])
+            if repo.process.poll() is not None:
+                out = repo.process.communicate()[0].decode('utf-8')
+                name = color('green', repo.user + '/' + repo.name)
                 log(name + ': ' + clone_output(out))
                 del PROCESSING[i]
                 break
@@ -694,14 +709,14 @@ def install_packages():
     instdir = pdir.path + ('/opt' if INSTOPT else '/start')
 
     for q in QUEUE:
-        repo = repo_validate(q)
-        if not repo:
+        repo = Repo(q)
+        if not repo.validate():
             continue
 
-        if not pdir.has(repo['name']):
+        if not pdir.has(repo.name):
             pdir.install(repo)
         else:
-            name = color('green', repo['user'] + '/' + repo['name'])
+            name = color('green', repo.user + '/' + repo.name)
             log(name + ': already installed')
 
     process_clones()
