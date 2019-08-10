@@ -13,7 +13,7 @@ from time import sleep,time
 #------------------------------------------------------------------------------
 
 
-ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git',
+ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git', 'exe',
             'move2opt', 'move2start', 'install', 'remotes' ]
 
 ACTION          = ''
@@ -205,7 +205,10 @@ class Package():
     def git(self):
         color = ' -c color.ui=always ' if COLOR else ' '
         return self.verbose_output(
-            self.shell('git' + color + GIT), nl=True)
+            self.shell('git' + color + EXE), nl=True)
+
+    def exe(self):
+        return self.verbose_output(self.shell(EXE), nl=True)
 
     def fetch(self):
         self.process = self.async_shell('git fetch --all')
@@ -364,6 +367,12 @@ class Packdir():
         for p in self.walk('start'):
             self.output(Package(os.path.basename(p)).git(), 'start')
 
+    def exe(self):
+        for p in self.walk('opt'):
+            self.output(Package(os.path.basename(p)).exe(), 'opt')
+        for p in self.walk('start'):
+            self.output(Package(os.path.basename(p)).exe(), 'start')
+
     def fetch(self):
         for p in self.walk('opt'):
             Package(os.path.basename(p)).fetch()
@@ -451,6 +460,7 @@ def print_help():
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
         ['git',         'run a single, quoted git command'],
+        ['exe',         'run a single, quoted command of any type'],
         ['install',     'install packages from remote repos'],
         ['move2opt',    'move package(s) into the /opt directory'],
         ['move2start',  'move package(s) into the /start directory'],
@@ -463,7 +473,7 @@ def print_help():
         ['-no',         'no output (for use inside scripts)'],
         ['-na',         'no async update/cloning'],
         ['-time',       'timeout for operations (default 15s)'],
-        ['-notime',     'no timeout'],
+        ['-notime',     'no timeout, and no async'],
         ['-opt',        'command only considers opt packages'],
         ['-start',      'command only considers start packages'],
     ]
@@ -612,7 +622,7 @@ def walk_arg(arg):
 
 def parse_args():
     """Parse arguments."""
-    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, GIT, COLOR
+    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR
     global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT
     args = sys.argv[1:]
 
@@ -647,7 +657,7 @@ def parse_args():
             else:
                 print_help()
         if ( args[0] == '-notime' ):
-            TIMEOUT = None
+            TIMEOUT, ASYNC = None, False
             del args[0]
             continue
         if ( args[0] == '-opt' ):
@@ -676,10 +686,10 @@ def parse_args():
         parse_install(args)
         return
 
-    if ( ACTION == 'git' ):
+    if ( ACTION in ['git', 'exe'] ):
         if ( not args ):
             print_help()
-        GIT = args.pop(0)
+        EXE = args.pop(0)
 
 
     # if no args beyond the command, perform on all packages, in all dirs
@@ -835,6 +845,7 @@ def process_action():
             'remotes': q.remotes,
             'fetch': q.fetch,
             'git': q.git,
+            'exe': q.exe,
             'move2opt': q.move2opt,
             'move2start': q.move2start
         }
