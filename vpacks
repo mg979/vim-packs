@@ -14,8 +14,8 @@ import webbrowser
 #------------------------------------------------------------------------------
 
 
-ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git', 'exe',
-            'move2opt', 'move2start', 'install', 'remotes', 'web' ]
+ACTIONS = [ 'list', 'update', 'status', 'verbose', 'web', 'git', 'exe', 'log',
+            'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph' ]
 
 ACTION          = ''
 ASYNC           = True
@@ -481,9 +481,11 @@ def print_help():
         ['verbose',     'verbose status (with diff)'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
-        ['web',         'open web page, if possible'],
+        ['log [-n]',    'log the last (-n) commit(s) for repo(s)'],
+        ['graph [-n]',  'log the graph of the commit history for repo(s)'],
         ['git',         'run a single, quoted git command'],
         ['exe',         'run a single, quoted command of any type'],
+        ['web',         'open web page, if possible'],
         ['move2opt',    'move package(s) into the /opt directory'],
         ['move2start',  'move package(s) into the /start directory'],
     ]
@@ -575,7 +577,7 @@ def log(string, end='\n'):
 
 def clear_screen():
     """Clear the terminal window."""
-    if not TERMINAL or NO_OUTPUT or ACTION in ['git', 'web']:
+    if not TERMINAL or NO_OUTPUT or ACTION in ['git', 'web', 'log']:
         return
     os.system('clear')
 
@@ -698,12 +700,20 @@ def parse_args():
     if ( ACTION not in ACTIONS ):
         print_help()
 
-    if ( ACTION == 'install' ):
+    elif ( ACTION == 'install' ):
         INSTALL = True
         parse_install(args)
         return
 
-    if ( ACTION in ['git', 'exe'] ):
+    elif ( ACTION == 'log' ):
+        n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else '-1'
+        EXE = 'log %s' % n
+
+    elif ( ACTION == 'graph' ):
+        n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else ''
+        EXE = 'log %s --graph --oneline' % n
+
+    elif ( ACTION in ['git', 'exe'] ):
         if ( not args ):
             print_help()
         EXE = args.pop(0)
@@ -855,17 +865,13 @@ def process_action():
     """
     for q in QUEUE:
         actions = {
-            'list': q.list,
-            'update': q.update,
-            'status': q.status,
-            'verbose': q.verbose,
-            'remotes': q.remotes,
-            'fetch': q.fetch,
-            'git': q.git,
-            'exe': q.exe,
-            'web': q.web,
-            'move2opt': q.move2opt,
-            'move2start': q.move2start
+            'list':     q.list,          'update':     q.update,
+            'status':   q.status,        'verbose':    q.verbose,
+            'remotes':  q.remotes,       'fetch':      q.fetch,
+            'move2opt': q.move2opt,      'move2start': q.move2start,
+            'git':      q.git,           'exe':        q.exe,
+            'log':      q.git,           'graph':      q.git,
+            'web':      q.web,
         }
         log ( actions[ACTION]() )
 
