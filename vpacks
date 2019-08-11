@@ -220,6 +220,8 @@ class Package():
     def move2opt(self, silent=False):
         name = color('green', self.name)
         pdir = self.packdir()
+        if name == 'vim-packs':
+            log(name + " will not be moved")
         if self.is_opt():
             log(name + " is already in /opt")
         else:
@@ -232,6 +234,8 @@ class Package():
     def move2start(self, silent=False):
         name = color('green', self.name)
         pdir = self.packdir()
+        if name == 'vim-packs':
+            log(name + " will not be moved")
         if self.is_start():
             log(name + " is already in /start")
         else:
