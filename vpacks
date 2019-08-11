@@ -18,9 +18,10 @@ ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git', 'exe',
 
 ACTION          = ''
 ASYNC           = True
-COLOR           = True
+COLOR           = os.name != 'nt'
 DECO            = True
 HAS_OUTPUT      = False
+HELP            = False
 INSTALL         = False
 INSTDIR         = 'vpacks'
 INSTOPT         = False
@@ -455,28 +456,34 @@ def print_help():
     commands = [
         ['list',        'list packages'],
         ['update',      'update packages'],
+        ['install',     'install packages from remote repos'],
         ['status',      'list only packages with a dirty working tree'],
         ['verbose',     'verbose status (with diff)'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
         ['git',         'run a single, quoted git command'],
         ['exe',         'run a single, quoted command of any type'],
-        ['install',     'install packages from remote repos'],
         ['move2opt',    'move package(s) into the /opt directory'],
         ['move2start',  'move package(s) into the /start directory'],
     ]
 
+    if not HELP:
+        commands = commands[:5]
+
     options = [
+        ['-h',          'extended help'],
         ['-nd',         'no decorations (color, headers)'],
         ['-nc',         'no color'],
-        ['-ps',         'print size for "list" subcommand'],
         ['-no',         'no output (for use inside scripts)'],
         ['-na',         'no async update/cloning'],
+        ['-ps',         'print size for "list" subcommand'],
         ['-time',       'timeout for operations (default 15s)'],
         ['-notime',     'no timeout, and no async'],
         ['-opt',        'command only considers opt packages'],
         ['-start',      'command only considers start packages'],
     ]
+
+    options = options[:4] if not HELP else options[1:]
 
     instopts = [
         ['opt',         'install in /opt directory rather than in /start'],
@@ -622,33 +629,33 @@ def walk_arg(arg):
 
 def parse_args():
     """Parse arguments."""
-    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR
+    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR, HELP
     global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT
     args = sys.argv[1:]
 
     while ( args ):
-        if ( args[0] == '-nd' ):
-            DECO = False
+        if (args[0] in ['-h', '-nd', '-nc', '-ps', '-no',
+                        '-notime', '-opt', '-start']):
+
+            if   ( args[0] == '-h'      ): HELP = True
+            elif ( args[0] == '-nd'     ): DECO = False
+            elif ( args[0] == '-nc'     ): COLOR = False
+            elif ( args[0] == '-ps'     ): SHOW_SIZE = True
+            elif ( args[0] == '-no'     ): NO_OUTPUT = True
+            elif ( args[0] == '-notime' ): TIMEOUT, ASYNC = None, False
+            elif ( args[0] == '-opt'    ): ONLY_OPT = True
+            elif ( args[0] == '-start'  ): ONLY_START = True
+
             del args[0]
             continue
-        if ( args[0] == '-nc' ):
-            COLOR = False
-            del args[0]
-            continue
-        if ( args[0] == '-ps' ):
-            SHOW_SIZE = True
-            del args[0]
-            continue
-        if ( args[0] == '-no' ):
-            NO_OUTPUT = True
-            del args[0]
-            continue
+
         if ( args[0] == '-na' ):
             ASYNC = False
             if TIMEOUT and TIMEOUT == 15:
                 TIMEOUT = 20
             del args[0]
             continue
+
         if ( args[0] == '-time' ):
             del args[0]
             if ( args ):
@@ -656,18 +663,7 @@ def parse_args():
                 continue
             else:
                 print_help()
-        if ( args[0] == '-notime' ):
-            TIMEOUT, ASYNC = None, False
-            del args[0]
-            continue
-        if ( args[0] == '-opt' ):
-            ONLY_OPT = True
-            del args[0]
-            continue
-        if ( args[0] == '-start' ):
-            ONLY_START = True
-            del args[0]
-            continue
+
         # exit loop when the first arg is found, that isn't an option
         break
 
