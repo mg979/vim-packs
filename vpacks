@@ -7,6 +7,7 @@ import subprocess
 import sys
 from shutil import which
 from time import sleep,time
+import webbrowser
 
 #------------------------------------------------------------------------------
 # Global variables
@@ -14,7 +15,7 @@ from time import sleep,time
 
 
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'fetch', 'git', 'exe',
-            'move2opt', 'move2start', 'install', 'remotes' ]
+            'move2opt', 'move2start', 'install', 'remotes', 'web' ]
 
 ACTION          = ''
 ASYNC           = True
@@ -211,6 +212,15 @@ class Package():
     def exe(self):
         return self.verbose_output(self.shell(EXE), nl=True)
 
+    def web(self):
+        try:
+            remote = self.shell('git remote')[0].splitlines()[0]
+            url = self.shell('git remote get-url ' + remote)[0].splitlines()[0]
+        except IndexError:
+            return color('red', 'fatal') + ": no web page for " + self.name
+        subprocess.run("python -m webbrowser '%s'" % url, shell=True,
+                       stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+
     def fetch(self):
         self.process = self.async_shell('git fetch --all')
         PROCESSING.append(self)
@@ -378,6 +388,12 @@ class Packdir():
         for p in self.walk('start'):
             self.output(Package(os.path.basename(p)).exe(), 'start')
 
+    def web(self):
+        for p in self.walk('opt'):
+            self.output(Package(os.path.basename(p)).web(), 'opt')
+        for p in self.walk('start'):
+            self.output(Package(os.path.basename(p)).web(), 'start')
+
     def fetch(self):
         for p in self.walk('opt'):
             Package(os.path.basename(p)).fetch()
@@ -465,6 +481,7 @@ def print_help():
         ['verbose',     'verbose status (with diff)'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
+        ['web',         'open web page, if possible'],
         ['git',         'run a single, quoted git command'],
         ['exe',         'run a single, quoted command of any type'],
         ['move2opt',    'move package(s) into the /opt directory'],
@@ -558,7 +575,7 @@ def log(string, end='\n'):
 
 def clear_screen():
     """Clear the terminal window."""
-    if not TERMINAL or NO_OUTPUT or ACTION in ['git']:
+    if not TERMINAL or NO_OUTPUT or ACTION in ['git', 'web']:
         return
     os.system('clear')
 
@@ -846,6 +863,7 @@ def process_action():
             'fetch': q.fetch,
             'git': q.git,
             'exe': q.exe,
+            'web': q.web,
             'move2opt': q.move2opt,
             'move2start': q.move2start
         }
