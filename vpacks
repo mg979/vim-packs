@@ -278,7 +278,11 @@ class Packdir():
     #--------------------------------------------------------------------------
 
     def ensure_exists(self):
-        if ( not os.path.exists(self.path) ):
+        if os.path.exists(self.path) and not os.path.isdir(self.path):
+            error("Path exists and is not a directory, aborting.")
+        if not os.path.exists(self.path):
+            if not confirm("Create directories in " + self.path):
+                error("Invalid directory, aborting.")
             os.makedirs(self.path + '/opt')
             os.makedirs(self.path + '/start')
 
