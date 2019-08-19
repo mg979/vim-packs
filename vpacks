@@ -110,6 +110,13 @@ class Package():
             c = cmd[0].replace('nothing to commit, working tree clean\n', '')
             return name + c
 
+    def helptags(self):
+        """Update helptags for package."""
+        docdir = (self.path + os.sep + 'doc').replace(' ', '\ ')
+        if os.path.isdir(docdir):
+            subprocess.run('vim -nEs -c "helptags %s | q"' % docdir, shell=True)
+            log('Helptags updated for ' + self.name)
+
     def output(self, cmd, updating=False):
         """Merge stdout and stderr if updating packages, otherwise prioritize
         stderr. Return an empty string if no output at all."""
@@ -333,13 +340,15 @@ class Packdir():
 
     def install(self, repo):
         if not self.has(repo.name):
+            packdir = self.path + ('/opt' if INSTOPT else '/start')
             repo.process = subprocess.Popen(
                 ['git', 'clone', '--depth', '1',
                  '--shallow-submodules', repo.address],
-                cwd=self.path + ('/opt' if INSTOPT else '/start'),
+                cwd=packdir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
             )
+            repo.path = packdir + os.sep + repo.name
             PROCESSING.append(repo)
             if not ASYNC:
                 wait(repo)
@@ -435,6 +444,7 @@ class Repo():
     def __init__(self, arg):
         self.arg = arg
         self.name = None
+        self.path = None
         self.user = None
         self.address = None
         self.process = None
@@ -778,6 +788,8 @@ def process_clones():
                 out = repo.process.communicate()[0].decode('utf-8')
                 name = color('green', repo.user + '/' + repo.name)
                 log(name + ': ' + clone_output(out))
+                PACKS['packs'][repo.name] = repo.path
+                Package(repo.name).helptags()
                 del PROCESSING[i]
                 break
             if TIMEOUT:
