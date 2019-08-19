@@ -631,10 +631,10 @@ def wait(pack):
     try:
         pack.process.wait(timeout=TIMEOUT)
     except TimeoutError:
-        timeout(pack.name)
+        warn_timeout(pack.name)
 
 
-def timeout(name):
+def warn_timeout(name):
     """Log warning when timeout has been reached."""
     log("%-30s" % (name + ': ') + color('red', "timeout %ds" % int(TIMEOUT)))
 
@@ -770,7 +770,7 @@ def process_clones():
 
         for repo in PROCESSING:
             if TIMEOUT and repo.timeout < 0:
-                timeout(repo.name)
+                warn_timeout(repo.name)
                 repo.process.terminate()
                 del PROCESSING[i]
                 break
@@ -832,7 +832,7 @@ def process_asynch(packdir=None, subdir=None):
 
         for pack in PROCESSING:
             if TIMEOUT and pack.timeout < 0:
-                timeout(pack.name)
+                warn_timeout(pack.name)
                 pack.process.terminate()
                 del PROCESSING[i]
                 break
