@@ -352,7 +352,7 @@ class Packdir():
 
     def install(self, repo):
         if not self.has(repo.name):
-            packdir = self.path + (_opt_ if INSTOPT else _start_)
+            packdir = self.path + _start_or_opt_()
             repo.process = subprocess.Popen(
                 ['git', 'clone', '--depth', '1',
                  '--shallow-submodules', repo.address],
@@ -635,6 +635,11 @@ def find_packs():
                 WARNINGS.append((msg, pack))
 
 
+def _start_or_opt_():
+    """Return /start/ or /opt/, with os separators."""
+    return _opt_ if INSTOPT else _start_
+
+
 def wait(pack):
     """Wait for process to terminate, handle TimeoutError."""
     try:
@@ -807,7 +812,7 @@ def install_packages():
     """Process the install queue."""
     pdir = Packdir(INSTDIR)
     pdir.ensure_exists()
-    instdir = pdir.path + (_opt_ if INSTOPT else _start_)
+    instdir = pdir.path + _start_or_opt_()
 
     for q in QUEUE:
         repo = Repo(q)
