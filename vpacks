@@ -16,7 +16,7 @@ import webbrowser
 
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'web', 'git', 'exe', 'log',
             'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
-            'helptags']
+            'helptags', 'backup', 'restore']
 
 ACTION          = ''
 ASYNC           = True
@@ -67,9 +67,11 @@ _pack_ = SEP + 'pack' + SEP
 
 class Package():
     """Class for vim packages."""
-    def __init__(self, name, pdir=None):
+    def __init__(self, name, pdir=None, restore_from_backup=False):
         self.name = name
-        if pdir:
+        if restore_from_backup:
+            self.path = BACKUPDIR + SEP + name
+        elif pdir:
             self.path = PACKS['dirs'][pdir] + name
         else:
             self.path = PACKS['packs'][name]
@@ -85,6 +87,7 @@ class Package():
                 'verbose': self.verbose,        'remotes': self.remotes,
                 'git':     self.git,            'exe':     self.exe,
                 'web':     self.web,            'status':  self.status,
+                'backup':  self.backup,         'restore': self.restore,
                 }[action]()
 
     def packdir(self):
@@ -191,6 +194,20 @@ class Package():
             fmt = "%-31s %-5s %10s\n"
             vals = (self.name, green('ok'), size)
         return fmt % vals
+
+    def restore(self):
+        """Move package from backup directory, into packages directory."""
+        src = BACKUPDIR + SEP + self.name
+        if not os.path.exists(src):
+            return red(self.name) + ' not in the backup directory'
+        dst = PACKS['vimdir'] + _pack_ + INSTDIR + _start_or_opt_()
+        shutil.move(src, dst)
+        return green(self.name) + ' moved into directory ' + dst
+
+    def backup(self):
+        """Move package into the backup directory."""
+        shutil.move(self.path, BACKUPDIR)
+        return green(self.name) + ' moved into the backup directory'
 
     def helptags(self):
         """Update helptags for package."""
@@ -376,6 +393,8 @@ class Packdir():
     def web(self):      self.cmd('web')
     def status(self):   self.cmd('status')
     def helptags(self): self.cmd('helptags')
+    def backup(self):   self.cmd('backup')
+    def restore(self):  self.cmd('restore')
 
     def cmd(self, action):
         for p in self.walk(_opt_):
@@ -486,6 +505,8 @@ def print_help():
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
         ['helptags',    'update helptags for package(s)'],
+        ['backup',      'move/list package(s) to the backup directory'],
+        ['restore',     'restore/list package(s) from the backup directory'],
         ['log [-n]',    'log the last (-n) commit(s) for repo(s)'],
         ['graph [-n]',  'log the graph of the commit history for repo(s)'],
         ['git',         'run a single, quoted git command'],
@@ -612,14 +633,15 @@ def warning(msg, pack):
 
 def find_packs():
     """Find vim and package directories and basenames."""
-    global WARNINGS
-    win = os.path.expanduser('~\\vimfiles')
-    nwin = os.path.expanduser('~/.vim')
+    global WARNINGS, BACKUPDIR
+    win             = os.path.expanduser('~\\vimfiles')
+    nwin            = os.path.expanduser('~/.vim')
     PACKS['vimdir'] = win if os.path.exists(win) else nwin
-    dirpaths = glob.glob(PACKS['vimdir'] + _pack_ + '*')
-    PACKS['dirs'] = {os.path.basename(folder): folder for folder in dirpaths}
-    packpaths = glob.glob(PACKS['vimdir'] + _pack_ + '*%s*%s*' % (SEP, SEP))
-    PACKS['packs'] = {}
+    BACKUPDIR       = PACKS['vimdir'] + _pack_ + 'backup'
+    dirpaths        = glob.glob(PACKS['vimdir'] + _pack_ + '*')
+    PACKS['dirs']   = {os.path.basename(folder): folder for folder in dirpaths}
+    packpaths       = glob.glob(PACKS['vimdir'] + _pack_ + '*%s*%s*' % (SEP, SEP))
+    PACKS['packs']  = {}
 
     for packpath in packpaths:
         key = os.path.basename(packpath)
@@ -638,6 +660,24 @@ def find_packs():
 def _start_or_opt_():
     """Return /start/ or /opt/, with os separators."""
     return _opt_ if INSTOPT else _start_
+
+
+def list_backup_dir():
+    backups = os.listdir(BACKUPDIR)
+    if not backups:
+        log('No packages in the backup directory.')
+    elif COLOR:
+        blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
+        log("\n" + blue + "─" * 67 + end)
+        log(bold + blue + "Packs in directory " + yelw + BACKUPDIR + end)
+        log(blue + "─" * 67 + end + "\n")
+    elif DECO:
+        log("\n" + "─" * 67)
+        log("Packs in directory " + BACKUPDIR)
+        log("─" * 67 + "\n")
+    for pack in backups:
+        log(pack)
+    sys.exit()
 
 
 def wait(pack):
@@ -723,6 +763,16 @@ def parse_args():
         parse_install(args)
         return
 
+    elif ( ACTION == 'backup' ):
+        os.makedirs(BACKUPDIR, exist_ok=True)
+        if ( not args ):
+            list_backup_dir()
+
+    elif ( ACTION == 'restore' ):
+        os.makedirs(BACKUPDIR, exist_ok=True)
+        parse_restore(args)
+        return
+
     elif ( ACTION == 'log' ):
         n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else '-1'
         EXE = 'log %s' % n
@@ -750,16 +800,27 @@ def parse_args():
 def parse_install(args):
     """Parse arguments that follow an 'install' subcommand."""
     global INSTDIR, INSTOPT
-
     for arg in args:
         if ( arg == 'opt' ):
             INSTOPT = True
-
         elif ( re.search('^dir=\w+', arg) ):
             INSTDIR = arg.replace('dir=', '')
-
         else:
             QUEUE.append(arg)
+
+
+def parse_restore(args):
+    """Parse arguments that follow an 'restore' subcommand."""
+    global INSTDIR, INSTOPT
+    if not args:
+        list_backup_dir()
+    for arg in args:
+        if ( arg == 'opt' ):
+            INSTOPT = True
+        elif ( re.search('^dir=\w+', arg) ):
+            INSTDIR = arg.replace('dir=', '')
+        else:
+            QUEUE.append(Package(arg, restore_from_backup=True))
 
 
 #------------------------------------------------------------------------------
@@ -893,6 +954,7 @@ def process_action():
             'git':      q.git,           'exe':        q.exe,
             'log':      q.git,           'graph':      q.git,
             'web':      q.web,           'helptags':   q.helptags,
+            'backup':   q.backup,        'restore':    q.restore,
         }
         log ( actions[ACTION]() )
 
