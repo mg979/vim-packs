@@ -79,6 +79,13 @@ class Package():
     # class helpers: specific to this class
     #--------------------------------------------------------------------------
 
+    def cmd(self, action):
+        return {
+                'verbose': self.verbose,        'remotes': self.remotes,
+                'git':     self.git,            'exe':     self.exe,
+                'web':     self.web,            'status':  self.status,
+                }[action]()
+
     def packdir(self):
         return re.sub(_opt_+'|'+_start_ + self.name + '$', '', self.path)
 
@@ -362,6 +369,19 @@ class Packdir():
     # class commands: methods names have their correspective in Package class
     #--------------------------------------------------------------------------
 
+    def verbose(self):  self.cmd('verbose')
+    def remotes(self):  self.cmd('remotes')
+    def git(self):      self.cmd('git')
+    def exe(self):      self.cmd('exe')
+    def web(self):      self.cmd('web')
+    def status(self):   self.cmd('status')
+
+    def cmd(self, action):
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).cmd(action), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).cmd(action), _start_)
+
     def list(self, show_size=None):
         for p in self.walk(_opt_):
             self.output(Package(os.path.basename(p)).list(show_size), _opt_)
@@ -375,42 +395,6 @@ class Packdir():
         for p in self.walk(_start_):
             Package(os.path.basename(p)).update()
         process_asynch(self, _start_)
-
-    def status(self):
-        for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).status(), _opt_)
-        for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).status(), _start_)
-
-    def verbose(self):
-        for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).verbose(), _opt_)
-        for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).verbose(), _start_)
-
-    def remotes(self):
-        for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).remotes(), _opt_)
-        for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).remotes(), _start_)
-
-    def git(self):
-        for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).git(), _opt_)
-        for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).git(), _start_)
-
-    def exe(self):
-        for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).exe(), _opt_)
-        for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).exe(), _start_)
-
-    def web(self):
-        for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).web(), _opt_)
-        for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).web(), _start_)
 
     def fetch(self):
         for p in self.walk(_opt_):
