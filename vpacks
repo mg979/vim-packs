@@ -15,7 +15,8 @@ import webbrowser
 
 
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'web', 'git', 'exe', 'log',
-            'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph' ]
+            'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
+            'helptags']
 
 ACTION          = ''
 ASYNC           = True
@@ -122,13 +123,6 @@ class Package():
             c = cmd[0].replace('nothing to commit, working tree clean\n', '')
             return name + c
 
-    def helptags(self):
-        """Update helptags for package."""
-        docdir = (self.path + SEP + 'doc').replace(' ', '\ ')
-        if os.path.isdir(docdir):
-            subprocess.run('vim -nEs -c "helptags %s | q"' % docdir, shell=True)
-            log('Helptags updated for ' + self.name)
-
     def output(self, cmd, updating=False):
         """Merge stdout and stderr if updating packages, otherwise prioritize
         stderr. Return an empty string if no output at all."""
@@ -197,6 +191,12 @@ class Package():
             fmt = "%-31s %-5s %10s\n"
             vals = (self.name, color('green', 'ok'), size)
         return fmt % vals
+
+    def helptags(self):
+        """Update helptags for package."""
+        docdir = (self.path + SEP + 'doc').replace(' ', '\ ')
+        if os.path.isdir(docdir):
+            subprocess.run('vim -nEs -c "helptags %s | q"' % docdir, shell=True)
 
     def update(self):
         self.process = self.async_shell('git pull --ff-only')
@@ -375,6 +375,7 @@ class Packdir():
     def exe(self):      self.cmd('exe')
     def web(self):      self.cmd('web')
     def status(self):   self.cmd('status')
+    def helptags(self): self.cmd('helptags')
 
     def cmd(self, action):
         for p in self.walk(_opt_):
@@ -484,6 +485,7 @@ def print_help():
         ['verbose',     'verbose status (with diff)'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
+        ['helptags',    'update helptags for package(s)'],
         ['log [-n]',    'log the last (-n) commit(s) for repo(s)'],
         ['graph [-n]',  'log the graph of the commit history for repo(s)'],
         ['git',         'run a single, quoted git command'],
@@ -846,6 +848,7 @@ def process_asynch(packdir=None, subdir=None):
                 else:
                     # query for single packs, no Packdir calls
                     log(pack.output(cmd, updating=update))
+                pack.helptags()
                 del PROCESSING[i]
                 break
             if TIMEOUT:
@@ -876,7 +879,7 @@ def process_action():
             'move2opt': q.move2opt,      'move2start': q.move2start,
             'git':      q.git,           'exe':        q.exe,
             'log':      q.git,           'graph':      q.git,
-            'web':      q.web,
+            'web':      q.web,           'helptags':   q.helptags,
         }
         log ( actions[ACTION]() )
 
