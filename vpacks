@@ -84,10 +84,11 @@ class Package():
 
     def cmd(self, action):
         return {
-                'verbose': self.verbose,        'remotes': self.remotes,
-                'git':     self.git,            'exe':     self.exe,
-                'web':     self.web,            'status':  self.status,
-                'backup':  self.backup,         'restore': self.restore,
+                'verbose':  self.verbose,        'remotes': self.remotes,
+                'git':      self.git,            'exe':     self.exe,
+                'web':      self.web,            'status':  self.status,
+                'backup':   self.backup,         'restore': self.restore,
+                'helptags': self.helptags,
                 }[action]()
 
     def packdir(self):
@@ -213,7 +214,8 @@ class Package():
         """Update helptags for package."""
         docdir = (self.path + SEP + 'doc').replace(' ', '\ ')
         if os.path.isdir(docdir):
-            subprocess.run('vim -nEs -c "helptags %s | q"' % docdir, shell=True)
+            subprocess.run(
+                    'vim -nEs -c "silent! helptags %s | q"' % docdir, shell=True)
 
     def update(self):
         self.process = self.async_shell('git pull --ff-only')
