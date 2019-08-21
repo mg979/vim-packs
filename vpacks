@@ -419,7 +419,7 @@ class Packdir():
         opt = color('green', self.path + '/opt/')
         start = color('green', self.path + '/start/')
         if confirm("Move all packages in " + start + "\n%21s" % "to " + opt):
-            os.makedirs(opt, exist_ok=True)
+            os.makedirs(self.path + '/opt'), exist_ok=True)
             for p in self.walk('start'):
                 Package(os.path.basename(p)).move2opt(silent=True)
             self.list(show_size=False)
@@ -428,7 +428,7 @@ class Packdir():
         opt = color('green', self.path + '/opt/')
         start = color('green', self.path + '/start/')
         if confirm("Move all packages in " + opt + "\n%21s" % "to " + start):
-            os.makedirs(start, exist_ok=True)
+            os.makedirs(self.path + '/start'), exist_ok=True)
             for p in self.walk('opt'):
                 Package(os.path.basename(p)).move2start(silent=True)
             self.list(show_size=False)
