@@ -53,6 +53,11 @@ COLORS = {
 
 UP_TO_DATE = re.compile('Already up-to-date.')
 
+SEP = os.sep
+_start_ = SEP + 'start' + SEP
+_opt_ = SEP + 'opt' + SEP
+_pack_ = SEP + 'pack' + SEP
+
 
 #------------------------------------------------------------------------------
 # Package class
@@ -64,7 +69,7 @@ class Package():
     def __init__(self, name, pdir=None):
         self.name = name
         if pdir:
-            self.path = PACKS['dirs'][pdir] + '/' + name
+            self.path = PACKS['dirs'][pdir] + name
         else:
             self.path = PACKS['packs'][name]
         self.is_package, self.process = True, None
@@ -75,13 +80,13 @@ class Package():
     #--------------------------------------------------------------------------
 
     def packdir(self):
-        return re.sub('/(opt|start)/' + self.name + '$', '', self.path)
+        return re.sub(_opt_+'|'+_start_ + self.name + '$', '', self.path)
 
     def is_opt(self):
-        return re.search('opt/' + self.name + '$', self.path)
+        return re.search(_opt_ + self.name + '$', self.path)
 
     def is_start(self):
-        return re.search('start/' + self.name + '$', self.path)
+        return re.search(_start_ + self.name + '$', self.path)
 
     def shell(self, cmd):
         """Run a shell command, return stdout and stderr."""
@@ -112,7 +117,7 @@ class Package():
 
     def helptags(self):
         """Update helptags for package."""
-        docdir = (self.path + os.sep + 'doc').replace(' ', '\ ')
+        docdir = (self.path + SEP + 'doc').replace(' ', '\ ')
         if os.path.isdir(docdir):
             subprocess.run('vim -nEs -c "helptags %s | q"' % docdir, shell=True)
             log('Helptags updated for ' + self.name)
@@ -243,8 +248,8 @@ class Package():
             log(name + " is already in /opt")
         else:
             log("Moving " + name + " to /opt")
-            subprocess.run(['mv', self.path, pdir + '/opt'])
-            PACKS['packs'][self.name] = pdir + '/opt/' + self.name
+            subprocess.run(['mv', self.path, pdir + _opt_])
+            PACKS['packs'][self.name] = pdir + _opt_ + self.name
         if not NO_OUTPUT and not silent:
             Packdir(os.path.basename(pdir)).list(show_size=False)
 
@@ -257,8 +262,8 @@ class Package():
             log(name + " is already in /start")
         else:
             log("Moving " + name + " to /start")
-            subprocess.run(['mv', self.path, pdir + '/start'])
-            PACKS['packs'][self.name] = pdir + '/start/' + self.name
+            subprocess.run(['mv', self.path, pdir + _start_])
+            PACKS['packs'][self.name] = pdir + _start_ + self.name
         if not NO_OUTPUT and not silent:
             Packdir(os.path.basename(pdir)).list(show_size=False)
 
@@ -275,7 +280,7 @@ class Packdir():
         if name in PACKS['dirs']:
             self.path = PACKS['dirs'][name]
         else:
-            self.path = PACKS['dirs'][name] = PACKS['vimdir'] + '/pack/' + name
+            self.path = PACKS['dirs'][name] = PACKS['vimdir'] + _pack_ + name
         self.is_package = False
         self.has_output_opt = False
         self.has_output_start = False
@@ -290,17 +295,17 @@ class Packdir():
         if not os.path.exists(self.path):
             if not confirm("Create directories in " + self.path):
                 error("Invalid directory, aborting.")
-            os.makedirs(self.path + '/opt')
-            os.makedirs(self.path + '/start')
+            os.makedirs(self.path + _opt_)
+            os.makedirs(self.path + _start_)
 
     def has(self, pack, in_opt=False, in_start=False):
         """Check if package is contained in this packdir."""
         if not in_start:
-            for p in self.walk('opt'):
+            for p in self.walk(_opt_):
                 if os.path.basename(p) == pack:
                     return p
         if not in_opt:
-            for p in self.walk('start'):
+            for p in self.walk(_start_):
                 if os.path.basename(p) == pack:
                     return p
 
@@ -310,37 +315,37 @@ class Packdir():
         if COLOR:
             blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
             log("\n" + blue + "─" * 67 + end)
-            log(bold + blue + "Packs in directory " + yelw + path + "/" + end)
+            log(bold + blue + "Packs in directory " + yelw + path + end)
             log(blue + "─" * 67 + end + "\n")
         else:
             log("\n" + "─" * 67)
-            log("Packs in directory " + path + "/")
+            log("Packs in directory " + path)
             log("─" * 67 + "\n")
 
     def walk(self, subdir):
-        if ( ONLY_OPT and subdir == 'start' ):
+        if ( ONLY_OPT and subdir == _start_ ):
             return []
-        if ( ONLY_START and subdir == 'opt' ):
+        if ( ONLY_START and subdir == _opt_ ):
             return []
-        if ( os.path.exists(self.path + '/' + subdir) ):
-            return glob.iglob(self.path + '/' + subdir + '/*')
+        if ( os.path.exists(self.path + subdir) ):
+            return glob.iglob(self.path + subdir + '*')
         return []
 
     def output(self, output, subdir):
         """Print the header only if there's some package to display."""
         if ( NO_OUTPUT or not output ):
             return
-        if ( not self.has_output_opt and subdir=='opt' and not ONLY_START ):
+        if ( not self.has_output_opt and subdir==_opt_ and not ONLY_START ):
             self.has_output_opt = True
-            self.header(self.path + '/opt')
-        if ( not self.has_output_start and subdir=='start' and not ONLY_OPT ):
+            self.header(self.path + _opt_)
+        if ( not self.has_output_start and subdir==_start_ and not ONLY_OPT ):
             self.has_output_start = True
-            self.header(self.path + '/start')
+            self.header(self.path + _start_)
         log(output, end='')
 
     def install(self, repo):
         if not self.has(repo.name):
-            packdir = self.path + ('/opt' if INSTOPT else '/start')
+            packdir = self.path + (_opt_ if INSTOPT else _start_)
             repo.process = subprocess.Popen(
                 ['git', 'clone', '--depth', '1',
                  '--shallow-submodules', repo.address],
@@ -348,7 +353,7 @@ class Packdir():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
             )
-            repo.path = packdir + os.sep + repo.name
+            repo.path = packdir + SEP + repo.name
             PROCESSING.append(repo)
             if not ASYNC:
                 wait(repo)
@@ -358,78 +363,78 @@ class Packdir():
     #--------------------------------------------------------------------------
 
     def list(self, show_size=None):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).list(show_size), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).list(show_size), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).list(show_size), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).list(show_size), _start_)
 
     def update(self):
-        for p in self.walk('opt'):
+        for p in self.walk(_opt_):
             Package(os.path.basename(p)).update()
-        process_asynch(self, 'opt')
-        for p in self.walk('start'):
+        process_asynch(self, _opt_)
+        for p in self.walk(_start_):
             Package(os.path.basename(p)).update()
-        process_asynch(self, 'start')
+        process_asynch(self, _start_)
 
     def status(self):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).status(), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).status(), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).status(), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).status(), _start_)
 
     def verbose(self):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).verbose(), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).verbose(), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).verbose(), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).verbose(), _start_)
 
     def remotes(self):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).remotes(), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).remotes(), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).remotes(), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).remotes(), _start_)
 
     def git(self):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).git(), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).git(), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).git(), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).git(), _start_)
 
     def exe(self):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).exe(), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).exe(), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).exe(), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).exe(), _start_)
 
     def web(self):
-        for p in self.walk('opt'):
-            self.output(Package(os.path.basename(p)).web(), 'opt')
-        for p in self.walk('start'):
-            self.output(Package(os.path.basename(p)).web(), 'start')
+        for p in self.walk(_opt_):
+            self.output(Package(os.path.basename(p)).web(), _opt_)
+        for p in self.walk(_start_):
+            self.output(Package(os.path.basename(p)).web(), _start_)
 
     def fetch(self):
-        for p in self.walk('opt'):
+        for p in self.walk(_opt_):
             Package(os.path.basename(p)).fetch()
-        process_asynch(self, 'opt')
-        for p in self.walk('start'):
+        process_asynch(self, _opt_)
+        for p in self.walk(_start_):
             Package(os.path.basename(p)).fetch()
-        process_asynch(self, 'start')
+        process_asynch(self, _start_)
 
     def move2opt(self):
-        opt = color('green', self.path + '/opt/')
-        start = color('green', self.path + '/start/')
+        opt = color('green', self.path + _opt_)
+        start = color('green', self.path + _start_)
         if confirm("Move all packages in " + start + "\n%21s" % "to " + opt):
-            os.makedirs(self.path + '/opt'), exist_ok=True)
-            for p in self.walk('start'):
+            os.makedirs(self.path + _opt_, exist_ok=True)
+            for p in self.walk(_start_):
                 Package(os.path.basename(p)).move2opt(silent=True)
             self.list(show_size=False)
 
     def move2start(self):
-        opt = color('green', self.path + '/opt/')
-        start = color('green', self.path + '/start/')
+        opt = color('green', self.path + _opt_)
+        start = color('green', self.path + _start_)
         if confirm("Move all packages in " + opt + "\n%21s" % "to " + start):
-            os.makedirs(self.path + '/start'), exist_ok=True)
-            for p in self.walk('opt'):
+            os.makedirs(self.path + _start_, exist_ok=True)
+            for p in self._walk(_opt_):
                 Package(os.path.basename(p)).move2start(silent=True)
             self.list(show_size=False)
 
@@ -617,9 +622,9 @@ def find_packs():
     win = os.path.expanduser('~\\vimfiles')
     nwin = os.path.expanduser('~/.vim')
     PACKS['vimdir'] = win if os.path.exists(win) else nwin
-    dirpaths = glob.glob(PACKS['vimdir'] + '/pack/*')
+    dirpaths = glob.glob(PACKS['vimdir'] + _pack_ + '*')
     PACKS['dirs'] = {os.path.basename(folder): folder for folder in dirpaths}
-    packpaths = glob.glob(PACKS['vimdir'] + '/pack/*/*/*')
+    packpaths = glob.glob(PACKS['vimdir'] + _pack_ + '*%s*%s*' % (SEP, SEP))
     PACKS['packs'] = {}
 
     for packpath in packpaths:
@@ -736,7 +741,7 @@ def parse_args():
     # if no args beyond the command, perform on all packages, in all dirs
     # otherwise perform on args (they could be single packages, or directories)
     if ( not args ):
-        for path in glob.iglob(PACKS['vimdir'] + '/pack/*'):
+        for path in glob.iglob(PACKS['vimdir'] + _pack_ + '*'):
             walk_arg(os.path.basename(path))
     else:
         for arg in args:
@@ -808,7 +813,7 @@ def install_packages():
     """Process the install queue."""
     pdir = Packdir(INSTDIR)
     pdir.ensure_exists()
-    instdir = pdir.path + ('/opt' if INSTOPT else '/start')
+    instdir = pdir.path + (_opt_ if INSTOPT else _start_)
 
     for q in QUEUE:
         repo = Repo(q)
