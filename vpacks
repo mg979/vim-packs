@@ -16,7 +16,7 @@ import webbrowser
 
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'web', 'git', 'exe', 'log',
             'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
-            'helptags', 'backup', 'restore']
+            'helptags', 'backup', 'restore', 'terminal']
 
 ACTION          = ''
 ASYNC           = True
@@ -223,6 +223,9 @@ class Package():
         if not ASYNC:
             wait(self)
 
+    def terminal(self):
+        subprocess.run('x-terminal-emulator', cwd=self.path)
+
     def status(self):
         cmd = self.shell('git status --porcelain')
         name = green(self.name)
@@ -404,6 +407,9 @@ class Packdir():
         for p in self.walk(_start_):
             self.output(Package(os.path.basename(p)).cmd(action), _start_)
 
+    def terminal(self):
+        error('terminal: not allowed for pack directories')
+
     def list(self, show_size=None):
         for p in self.walk(_opt_):
             self.output(Package(os.path.basename(p)).list(show_size), _opt_)
@@ -506,6 +512,7 @@ def print_help():
         ['verbose',     'verbose status (with diff)'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
+        ['terminal',    'open a new terminal at package directory'],
         ['helptags',    'update helptags for package(s)'],
         ['backup',      'move/list package(s) to the backup directory'],
         ['restore',     'restore/list package(s) from the backup directory'],
@@ -957,6 +964,7 @@ def process_action():
             'log':      q.git,           'graph':      q.git,
             'web':      q.web,           'helptags':   q.helptags,
             'backup':   q.backup,        'restore':    q.restore,
+            'terminal': q.terminal,
         }
         log ( actions[ACTION]() )
 

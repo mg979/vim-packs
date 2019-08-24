@@ -5,7 +5,7 @@
 __vpacks_completions()
 {
 	if [ "${#COMP_WORDS[@]}" == "2" ]; then
-		COMPREPLY=($(compgen -W "list update status verbose fetch move2start move2opt install remotes git" "${COMP_WORDS[1]}"))
+		COMPREPLY=($(compgen -W "list update status verbose web git exe log move2opt move2start remotes fetch graph helptags backup terminal" "${COMP_WORDS[1]}"))
 	elif [ "${#COMP_WORDS[@]}" == "3" ]; then
 		local packdirs=$(echo $HOME/.vim/pack/* | sed "s@$HOME/.vim/pack/@@g")
 		local packs=$(echo $HOME/.vim/pack/*/*/* | sed "s@$HOME/.vim/pack/[^/]\+/[^/]\+/@@g")
