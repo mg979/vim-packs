@@ -203,12 +203,12 @@ class Package():
             return red(self.name) + ' not in the backup directory'
         dst = PACKS['vimdir'] + _pack_ + INSTDIR + _start_or_opt_()
         shutil.move(src, dst)
-        return green(self.name) + ' moved into directory ' + dst
+        return green(self.name) + ' moved into directory ' + dst + '\n'
 
     def backup(self):
         """Move package into the backup directory."""
         shutil.move(self.path, BACKUPDIR)
-        return green(self.name) + ' moved into the backup directory'
+        return green(self.name) + ' moved into the backup directory\n'
 
     def helptags(self):
         """Update helptags for package."""
@@ -649,7 +649,13 @@ def find_packs():
     BACKUPDIR       = PACKS['vimdir'] + _pack_ + 'backup'
     dirpaths        = glob.glob(PACKS['vimdir'] + _pack_ + '*')
     PACKS['dirs']   = {os.path.basename(folder): folder for folder in dirpaths}
+
+    if 'backup' in PACKS['dirs']:
+        del PACKS['dirs']['backup']
+
+    bdir            = re.compile(BACKUPDIR)
     packpaths       = glob.glob(PACKS['vimdir'] + _pack_ + '*%s*%s*' % (SEP, SEP))
+    packpaths       = list(filter(lambda pdir: not re.search(bdir, pdir), packpaths))
     PACKS['packs']  = {}
 
     for packpath in packpaths:
