@@ -808,6 +808,8 @@ def parse_args():
     # otherwise perform on args (they could be single packages, or directories)
     if ( not args ):
         for path in glob.iglob(PACKS['vimdir'] + _pack_ + '*'):
+            if os.path.basename(path) == 'backup':
+                continue
             walk_arg(os.path.basename(path))
     else:
         for arg in args:
