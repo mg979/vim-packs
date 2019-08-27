@@ -224,7 +224,9 @@ class Package():
             wait(self)
 
     def terminal(self):
-        subprocess.run('x-terminal-emulator', cwd=self.path)
+        subprocess.run(
+            ['exo-open', '--launch', 'TerminalEmulator',
+             '--working-directory', '%s' % self.path.replace(' ', '\ ')])
 
     def status(self):
         cmd = self.shell('git status --porcelain')
