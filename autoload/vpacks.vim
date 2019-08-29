@@ -4,29 +4,45 @@
 " File:        vpacks.vim
 " Url:         https://github.com/mg979/vim-packs
 " License:     MIT License
-" Modified:    lun 26 agosto 2019 09:00:45
+" Modified:    gio 29 agosto 2019 23:22:50
 " ========================================================================///
-
-"------------------------------------------------------------------------------
 
 fun! vpacks#check_packages() abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
 
-  new
+  exe tabpagenr()-1 . 'tabnew'
   setlocal bt=nofile bh=wipe noswf nobl
-  call setline(1, 'Packages:')
+
+  syn keyword VpacksOk OK
+  syn keyword VpacksLazy LAZY
+  syn keyword VpacksFail FAIL
+  syn match   VpacksPack '^\%>1l.\{30}'
+  hi default link VpacksOk diffAdded
+  hi default link VpacksFail diffRemoved
+  hi default link VpacksPack Special
+  hi default link VpacksLazy Constant
+
+  call setline(1, printf("%-30s\tStatus\t\t%-38s\tOptions", 'Packages', 'Repo'))
   put =''
-  for pack in keys(packs)
-    let s = printf("\t%-20s\t%s", pack, string(packs[pack]))
-          " \ (packs[pack].status?'ok':'no'))
-    put =s
+  for pack in sort(keys(packs))
+    let status  = ['FAIL', 'OK', 'LAZY'][packs[pack].status]
+    let url     = packs[pack].url
+    let options = empty(packs[pack].options) ? '-' : string(packs[pack].options)
+    let string  = printf("\t%-30s\t%4s\t%-40s\t%s", pack, status, url, options)
+    put =string
   endfor
   call append(line('$'), '')
+  if empty(errors)
+    call append(line('$'), 'No errors')
+    1
+    return
+  endif
   call append(line('$'), 'Errors:')
   call append(line('$'), '')
   for err in errors
     call append('$', "\t".err)
   endfor
+  1
 endfun
 
 "------------------------------------------------------------------------------

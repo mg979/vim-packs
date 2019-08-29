@@ -4,10 +4,12 @@
 
 A light command-line package manager for vim 8 (or nvim), written in python.
 
+-------------------------------------------------------------------------------
+
 ## Installation
 
 Put the python executable somewhere (preferably in your path), then you can run
-it from the terminal. Tested in Linux only (should work in mintty too).
+it from the terminal. Tested in Linux only (could work in mintty too).
 
 If you want tab completion, also source the optional shell script in your
 .bashrc:
@@ -23,23 +25,28 @@ You should then make a link to the executable in a directory in your path:
 
     ln -s ~/.vim/pack/vpacks/opt/vim-packs/vpacks ~/.local/bin/vpacks
 
-## Options explained
+-------------------------------------------------------------------------------
+
+## Options
 
 Commands (`list`, `update`, etc) are performed on *all* packages if given
 without arguments.
 
-Most options are straightforward and described in the command line help.
+Options are described in the command line help:
 
-- the `-nd` (no decorations) option can be useful in combination with `grep`
-- the `-na` (no async) option should be used if you must insert passwords
-- the `-ps` (print size) option only works with the `list` command
+    vpacks              // no arguments -> short help
+    vpacks -h           // full help
 
 The `list` command also shows if there are modified/untracked files in the
 working tree of the plugin:
 
 ![Imgur](https://i.imgur.com/oQn13PY.gif)
 
+-------------------------------------------------------------------------------
+
 ## Installing packages
+
+    vpacks install user/repo
 
 The script recognizes the following formats for remote repos:
 
@@ -54,3 +61,47 @@ The default directory when installing is `vpacks`, in the `opt` subdirectory
 (so for example `~/.vim/pack/vpacks/opt/plugin-name`), you can specify
 a different directory with the `dir=` option, or `vpacks install start` to
 install in the start subdirectory. Read the help for details.
+
+-------------------------------------------------------------------------------
+
+## Vim support plugin
+
+**NOTE**: the following commands aren't necessary for the plugins to work, if
+you put them in your `pack/*/start/` directories. They actually **require**
+that you keep your plugins in the `pack/*/opt/` directories.
+Only use them if:
+
+* you want to lazy load some plugins
+* you want greater control on which plugins to load
+* you want a way to have from Vim an overview of the installed plugins
+* you are making the transition from another plugin manager
+
+The syntax is meant to be very similar to the one used by [vim-plug](https://github.com/junegunn/vim-plug).
+Implementation is still partial, only `on` and `for` options are supported.
+
+```vim
+" first add vpacks itself, so that commands will run
+" don't use bang, and be sure that vpacks is in a /opt directory, not in /start
+packadd vim-packs
+
+" packadd! a plugin, complete with repo address
+Pack 'tpope/vim-surround'
+
+" a local plugin can still be updated, if it is a valid repo with remotes
+Pack 'vim-fugitive'
+
+" lazy load plugins for specific filetypes
+Pack 'davidhalter/jedi-vim', {'for': 'python'}
+
+" lazy load plugins on specific commands
+Pack 'Olical/vim-enmasse', { 'on': 'EnMasse' }
+
+" infos about added package, and errors about missing packages
+PacksCheck
+
+" try to install missing packages (won't work with local plugins)
+PacksInstall
+```
+
+TODO: improve bash completion, post-install/update hooks, etc.
+
