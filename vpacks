@@ -26,7 +26,7 @@ HAS_OUTPUT      = False
 HELP            = False
 INSTALL         = False
 INSTDIR         = 'vpacks'
-INSTOPT         = False
+INSTOPT         = True
 NO_OUTPUT       = False
 ONLY_OPT        = False
 ONLY_START      = False
@@ -546,6 +546,7 @@ def print_help():
     options = options[:4] if not HELP else options[1:]
 
     instopts = [
+        ['start',       'install in /start directory rather than in /opt'],
         ['opt',         'install in /opt directory rather than in /start'],
         ['dir=DIR',     'set base installation directory for packages'],
     ]
@@ -822,6 +823,8 @@ def parse_install(args):
     for arg in args:
         if ( arg == 'opt' ):
             INSTOPT = True
+        elif ( arg == 'start' ):
+            INSTOPT = False
         elif ( re.search('^dir=\w+', arg) ):
             INSTDIR = arg.replace('dir=', '')
         else:
@@ -836,6 +839,8 @@ def parse_restore(args):
     for arg in args:
         if ( arg == 'opt' ):
             INSTOPT = True
+        elif ( arg == 'start' ):
+            INSTOPT = False
         elif ( re.search('^dir=\w+', arg) ):
             INSTDIR = arg.replace('dir=', '')
         else:
