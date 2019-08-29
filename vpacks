@@ -496,7 +496,7 @@ class Repo():
                 self.user = re.match('.*/([^/]+)/', self.address).group(1)
         except:
             return False
-        return True
+        return self.address
 
 
 #------------------------------------------------------------------------------
@@ -902,6 +902,7 @@ def install_packages():
     for q in QUEUE:
         repo = Repo(q)
         if not repo.validate():
+            log(q + ' is not a valid argument')
             continue
 
         if repo.name in PACKS['packs']:

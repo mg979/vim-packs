@@ -21,7 +21,7 @@ update itself with the other plugins. First download the script, then run it:
 
 You should then make a link to the executable in a directory in your path:
 
-    ln -s ~/.vim/pack/vpacks/start/vim-packs/vpacks ~/.local/bin/vpacks
+    ln -s ~/.vim/pack/vpacks/opt/vim-packs/vpacks ~/.local/bin/vpacks
 
 ## Options explained
 
@@ -50,6 +50,7 @@ The script recognizes the following formats for remote repos:
 
 Repositories are cloned with `--depth 1` (shallow clones) to save disk space.
 
-The default directory when installing is `vpacks` (so for example
-`~/.vim/pack/vpacks/start/plugin-name`), you can specify a different directory
-with the `dir=` option.
+The default directory when installing is `vpacks`, in the `opt` subdirectory
+(so for example `~/.vim/pack/vpacks/opt/plugin-name`), you can specify
+a different directory with the `dir=` option, or `vpacks install start` to
+install in the start subdirectory. Read the help for details.
