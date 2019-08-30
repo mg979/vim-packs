@@ -55,17 +55,27 @@ fun! vpacks#install_packages() abort
     echo '[vpacks] no packages to install'
     return
   endif
-  new
-  setlocal bt=nofile bh=wipe noswf nobl
-  call setline(1, "Installing packages...")
-  put =''
-  call append('$', '')
-  let Inst = function('s:install')
-  call timer_start(100, Inst)
+  let sl = '[vpacks] Installing packages, please wait...'
+  call vpacks#run(0, 'install opt ' . join(s:urls), sl)
 endfun
 
-fun! s:install(...)
-  exe 'r! vpacks -nc install opt' join(s:urls)
+"------------------------------------------------------------------------------
+
+fun! vpacks#run(bang, cmd, ...) abort
+  echo "\r"
+  if a:bang || get(g:, 'vpacks_force_true_terminal', 0)
+    exe '!vpacks' a:cmd
+  elseif has('nvim')
+    vnew
+    setlocal bt=nofile bh=wipe noswf nobl
+    exe 'terminal vpacks' a:cmd
+    let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
+  elseif has('terminal')
+    exe 'vertical terminal ++noclose ++norestore vpacks' a:cmd
+    let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
+  else
+    exe '!vpacks' a:cmd
+  endif
 endfun
 
 "------------------------------------------------------------------------------

@@ -66,6 +66,10 @@ install in the start subdirectory. Read the help for details.
 
 ## Vim support plugin
 
+You can run the shell command from vim, in a terminal buffer if supported:
+
+    Vpacks [arguments]
+
 **NOTE**: the following commands aren't necessary for the plugins to work, if
 you put them in your `pack/*/start/` directories. They actually **require**
 that you keep your plugins in the `pack/*/opt/` directories.

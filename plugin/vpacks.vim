@@ -17,7 +17,8 @@ let g:vpacks = { 'packages': {}, 'errors': [] }
 
 "------------------------------------------------------------------------------
 
-command! -bang -nargs=+ Pack call s:add_package(<bang>0, <args>)
+command! -bang -nargs=+ Pack   call s:add_package(<bang>0, <args>)
+command! -bang -nargs=* Vpacks call vpacks#run(<bang>0, <q-args>)
 
 command! PacksCheck   call vpacks#check_packages()
 command! PacksInstall call vpacks#install_packages()
