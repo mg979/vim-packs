@@ -96,10 +96,13 @@ Pack 'davidhalter/jedi-vim', {'for': 'python'}
 " lazy load plugins on specific commands
 Pack 'Olical/vim-enmasse', { 'on': 'EnMasse' }
 
+" also working with lists, and plugs
+Pack 'mhinz/vim-grepper', { 'on': ['Grepper', '<plug>(GrepperOperator)'] }
+
 " infos about added package, and errors about missing packages
 PacksCheck
 
-" try to install missing packages (won't work with local plugins)
+" try to install missing packages (it won't work with local plugins)
 PacksInstall
 ```
 

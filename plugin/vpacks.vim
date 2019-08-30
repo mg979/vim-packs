@@ -67,6 +67,16 @@ endfun
 
 "------------------------------------------------------------------------------
 
+fun! s:make_cmd(name, com) abort
+  if match(a:com, '\c<plug>') == 0
+    let cmd = "noremap <silent> %s :call vpacks#lazy_plug('%s', '%s')\<CR>"
+    exe printf(cmd, a:com, a:name, a:com)
+  else
+    let cmd = "call vpacks#lazy_cmd('%s', '%s', <bang>0, <q-args>)"
+    exe 'com! -bang -nargs=?' a:com printf(cmd, a:name, a:com)
+  endif
+endfun
+
 fun! s:options(name, options) abort
   " 'for': load for filetype
   " 'on':  load on command
@@ -78,12 +88,11 @@ fun! s:options(name, options) abort
     exe 'augroup END'
 
   elseif index(keys(a:options), 'on') >= 0
-    let cmd = 'call vpacks#lazy("%s", "%s", <bang>0, <q-args>)'
     if type(a:options.on) == v:t_string
-      exe 'com! -bang -nargs=?' a:options.on printf(cmd, a:name, a:options.on)
+      call s:make_cmd(a:name, a:options.on)
     else
       for com in a:options.on
-        exe 'com! -bang -nargs=?' com printf(cmd, a:name, com)
+        call s:make_cmd(a:name, com)
       endfor
     endif
   endif

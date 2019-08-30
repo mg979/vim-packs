@@ -70,12 +70,35 @@ endfun
 
 "------------------------------------------------------------------------------
 
-fun! vpacks#lazy(name, cmd, bang, args) abort
+fun! vpacks#lazy_cmd(name, cmd, bang, args) abort
   exe "delcommand" a:cmd
   exe "Pack! '".a:name."'"
   if g:vpacks.packages[a:name].status
     let b = a:bang ? '!' : ''
     call feedkeys(printf(":%s%s %s\<CR>", a:cmd, b, a:args), 'n')
+  else
+    echohl WarningMsg
+    echo '[vpacks] could not add package'
+    echohl None
+  endif
+endfun
+
+"------------------------------------------------------------------------------
+
+fun! vpacks#lazy_plug(name, plug) abort
+  exe "unmap" a:plug
+  exe "Pack! '".a:name."'"
+  if g:vpacks.packages[a:name].status
+    " snippet from vim-plug by Junegunn Choi
+    let extra = ''
+    while 1
+      let c = getchar(0)
+      if c == 0
+        break
+      endif
+      let extra .= nr2char(c)
+    endwhile
+    call feedkeys(substitute(a:plug, '\c<Plug>', "\<Plug>", '') . extra)
   else
     echohl WarningMsg
     echo '[vpacks] could not add package'
