@@ -78,8 +78,16 @@ fun! s:make_cmd(name, com) abort
 endfun
 
 fun! s:options(name, options) abort
+  " 'dir': custom runtime
   " 'for': load for filetype
   " 'on':  load on command/plug
+
+  if index(keys(a:options), 'dir') >= 0
+    let dir = fnamemodify(a:options.dir, ':p')
+    let g:vpacks.packages[a:name].status = isdirectory(dir)
+    let &runtimepath = dir . ',' . &runtimepath
+    return
+  endif
 
   if index(keys(a:options), 'for') >= 0
     let g:vpacks.packages[a:name].status = 2

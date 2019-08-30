@@ -49,7 +49,8 @@ endfun
 
 fun! vpacks#install_packages() abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
-  let to_install = filter(copy(packs), '!v:val.status && v:val.url!=""')
+  let to_install = filter(copy(packs),
+        \'!v:val.status && v:val.url!="" && !has_key(v:val.options, "dir")')
   let s:urls = map(keys(to_install), 'to_install[v:val].url')
   if empty(s:urls)
     echo '[vpacks] no packages to install'

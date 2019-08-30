@@ -103,6 +103,9 @@ Pack 'Olical/vim-enmasse', { 'on': 'EnMasse' }
 " also working with lists, and plugs
 Pack 'mhinz/vim-grepper', { 'on': ['Grepper', '<plug>(GrepperOperator)'] }
 
+" not a package, but add to runtimepath anyway, cannot be installed or updated
+Pack 'junegunn/fzf', { 'dir': '~/.fzf' }
+
 " infos about added package, and errors about missing packages
 PacksCheck
 
