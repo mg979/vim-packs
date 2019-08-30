@@ -11,7 +11,7 @@ fun! vpacks#check_packages() abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
 
   exe tabpagenr()-1 . 'tabnew'
-  setlocal bt=nofile bh=wipe noswf nobl
+  setlocal bt=nofile bh=wipe noswf nobl nowrap
 
   syn keyword VpacksOk OK
   syn keyword VpacksLazy LAZY
@@ -67,3 +67,19 @@ endfun
 fun! s:install(...)
   exe 'r! vpacks -nc install opt' join(s:urls)
 endfun
+
+"------------------------------------------------------------------------------
+
+fun! vpacks#lazy(name, cmd, bang, args) abort
+  exe "delcommand" a:cmd
+  exe "Pack! '".a:name."'"
+  if g:vpacks.packages[a:name].status
+    let b = a:bang ? '!' : ''
+    call feedkeys(printf(":%s%s %s\<CR>", a:cmd, b, a:args), 'n')
+  else
+    echohl WarningMsg
+    echo '[vpacks] could not add package'
+    echohl None
+  endif
+endfun
+

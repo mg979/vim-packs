@@ -43,13 +43,13 @@ fun! s:add_package(bang, ...)
     let packs[name].status = 2
     call s:options(name, options)
   else
-    call s:add(name, a:bang)
+    call s:add(name, a:000[0], a:bang)
   endif
 endfun
 
 "------------------------------------------------------------------------------
 
-fun! s:add(name, lazy) abort
+fun! s:add(name, url, lazy) abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
   let cmd = 'packadd' . (a:lazy ? '' : '!')
   try
@@ -57,7 +57,7 @@ fun! s:add(name, lazy) abort
     let packs[a:name].status = 1
   catch
     let packs[a:name].status = 0
-    call add(errors, 'Could not add package: '. a:000[0])
+    call add(errors, 'Could not add package: '. a:url)
   endtry
   if a:lazy
     exe 'silent! autocmd!  vpacks-'.a:name
@@ -78,15 +78,12 @@ fun! s:options(name, options) abort
     exe 'augroup END'
 
   elseif index(keys(a:options), 'on') >= 0
-    let q    = ' " . <q-args> . "'
-    let cr   = "\n"
-    let cmd  = printf('exe "Pack! %s" | ', "'".a:name."'")
-    let cmd .= 'call feedkeys(":' . a:options.on . q . cr .'", "n")' . cr
+    let cmd = 'call vpacks#lazy("%s", "%s", <bang>0, <q-args>)'
     if type(a:options.on) == v:t_string
-      exe 'com! -nargs=?' a:options.on cmd
+      exe 'com! -bang -nargs=?' a:options.on printf(cmd, a:name, a:options.on)
     else
       for com in a:options.on
-        exe 'com! -nargs=?' a:options.on cmd
+        exe 'com! -bang -nargs=?' com printf(cmd, a:name, com)
       endfor
     endif
   endif
