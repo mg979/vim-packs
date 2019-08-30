@@ -41,7 +41,6 @@ fun! s:add_package(bang, ...)
     call add(errors, 'Invalid package: '. string(a:000[0]))
   endtry
   if !a:bang && !empty(options)
-    let packs[name].status = 2
     call s:options(name, options)
   else
     call s:add(name, a:000[0], a:bang)
@@ -80,15 +79,18 @@ endfun
 
 fun! s:options(name, options) abort
   " 'for': load for filetype
-  " 'on':  load on command
+  " 'on':  load on command/plug
 
   if index(keys(a:options), 'for') >= 0
+    let g:vpacks.packages[a:name].status = 2
     let au = 'vpacks-'.a:name
     exe 'augroup' au
     exe 'au FileType' a:options.for "Pack! '".a:name."'"
     exe 'augroup END'
+  endif
 
-  elseif index(keys(a:options), 'on') >= 0
+  if index(keys(a:options), 'on') >= 0
+    let g:vpacks.packages[a:name].status = 2
     if type(a:options.on) == v:t_string
       call s:make_cmd(a:name, a:options.on)
     else
