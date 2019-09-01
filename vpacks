@@ -54,7 +54,7 @@ COLORS = {
 
 UP_TO_DATE = re.compile('Already up-to-date.')
 
-SEP = os.sep
+SEP = os.sep.replace('\\', '\\\\')
 _start_ = SEP + 'start' + SEP
 _opt_ = SEP + 'opt' + SEP
 _pack_ = SEP + 'pack' + SEP
@@ -349,9 +349,9 @@ class Packdir():
             log(bold + blue + "Packs in directory " + yelw + path + end)
             log(blue + "─" * 67 + end + "\n")
         else:
-            log("\n" + "─" * 67)
+            log("\n" + "-" * 67)
             log("Packs in directory " + path)
-            log("─" * 67 + "\n")
+            log("-" * 67 + "\n")
 
     def walk(self, subdir):
         if ( ONLY_OPT and subdir == _start_ ):
@@ -618,6 +618,8 @@ def red(string):
 def log(string, end='\n'):
     """Print output if allowed."""
     if not NO_OUTPUT and string:
+        if os.name == 'nt':
+            string = string.replace('\\\\', '\\')
         print(string, end=end)
 
 
@@ -646,7 +648,7 @@ def warning(msg, pack):
 def find_packs():
     """Find vim and package directories and basenames."""
     global WARNINGS, BACKUPDIR
-    win             = os.path.expanduser('~\\vimfiles')
+    win             = os.path.expanduser('~\\vimfiles').replace('\\', '\\\\')
     nwin            = os.path.expanduser('~/.vim')
     PACKS['vimdir'] = win if os.path.exists(win) else nwin
     BACKUPDIR       = PACKS['vimdir'] + _pack_ + 'backup'
