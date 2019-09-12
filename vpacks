@@ -623,13 +623,6 @@ def log(string, end='\n'):
         print(string, end=end)
 
 
-def clear_screen():
-    """Clear the terminal window."""
-    if not TERMINAL or NO_OUTPUT or ACTION in ['git', 'web', 'log']:
-        return
-    os.system('clear')
-
-
 def confirm(string):
     """Always return True with -no option."""
     if NO_OUTPUT:
@@ -999,7 +992,6 @@ def main():
     """Main function."""
     find_packs()            # find packages and their directories
     parse_args()            # build the action/installation queue
-    clear_screen()          # clear the screen if appropriate
 
     if INSTALL:
         install_packages()
