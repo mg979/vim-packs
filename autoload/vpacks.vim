@@ -27,7 +27,8 @@ fun! vpacks#check_packages() abort
   for pack in sort(keys(packs))
     let status  = ['FAIL', 'OK', 'LAZY'][packs[pack].status]
     let url     = packs[pack].url
-    let options = empty(packs[pack].options) ? '-' : string(packs[pack].options)
+    let options = empty(packs[pack].options) ? '-'
+          \     : string(filter(packs[pack].options, 'v:key != "is_lazy"'))
     let string  = printf("\t%-30s\t%4s\t%-40s\t%s", pack, status, url, options)
     put =string
   endfor

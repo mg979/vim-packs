@@ -25,11 +25,14 @@ command! PacksInstall call vpacks#install_packages()
 
 "------------------------------------------------------------------------------
 
+" Pack command calls this function.
+" a bang! means that the packadd command must be called *without* bang
+" that is, the package will be added immediately to the runtimepath.
 fun! s:add_package(bang, ...)
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
   try
-    let url  = split(a:000[0], '/')
-    let name = len(url) == 1 ? url[0] : url[-1]
+    let url     = split(a:000[0], '/')
+    let name    = len(url) == 1 ? url[0] : url[-1]
     let options = len(a:000) > 1 && type(a:2) == v:t_dict ? a:2 : {}
     if !has_key(packs, name)
       let packs[name] = {
@@ -40,18 +43,18 @@ fun! s:add_package(bang, ...)
   catch
     call add(errors, 'Invalid package: '. string(a:000[0]))
   endtry
-  if !a:bang && !empty(options)
+  if !empty(options) && !has_key(options, 'is_lazy')
     call s:options(name, options)
   else
-    call s:add(name, a:000[0], a:bang)
+    call s:add(name, a:000[0], has_key(options, 'is_lazy'), a:bang)
   endif
 endfun
 
 "------------------------------------------------------------------------------
 
-fun! s:add(name, url, lazy) abort
+fun! s:add(name, url, lazy, bang) abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
-  let cmd = 'packadd' . (a:lazy ? '' : '!')
+  let cmd = 'packadd' . (a:lazy || a:bang ? '' : '!')
   try
     exe cmd a:name
     let packs[a:name].status = 1
@@ -91,14 +94,16 @@ fun! s:options(name, options) abort
 
   if index(keys(a:options), 'for') >= 0
     let g:vpacks.packages[a:name].status = 2
+    let a:options.is_lazy = 1
     let au = 'vpacks-'.a:name
     exe 'augroup' au
-    exe 'au FileType' a:options.for "Pack! '".a:name."'"
+    exe 'au FileType' a:options.for "Pack '".a:name."'"
     exe 'augroup END'
   endif
 
   if index(keys(a:options), 'on') >= 0
     let g:vpacks.packages[a:name].status = 2
+    let a:options.is_lazy = 1
     if type(a:options.on) == v:t_string
       call s:make_cmd(a:name, a:options.on)
     else

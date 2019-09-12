@@ -91,6 +91,12 @@ packadd vim-packs
 " packadd! a plugin, complete with repo address
 Pack 'tpope/vim-surround'
 
+" packadd a plugin, complete with repo address
+" note that the bang will cause the packadd command to be called *without* bang
+" that means that the package will be immediately be added to the runtimepath
+" and sourced, see ':help initialization'
+Pack! 'vim-airline/vim-airline'
+
 " a local plugin can still be updated, if it is a valid repo with remotes
 Pack 'vim-fugitive'
 
