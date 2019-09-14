@@ -88,7 +88,11 @@ fun! s:options(name, options) abort
   if index(keys(a:options), 'dir') >= 0
     let dir = fnamemodify(a:options.dir, ':p')
     let g:vpacks.packages[a:name].status = isdirectory(dir)
-    let &runtimepath = dir . ',' . &runtimepath
+    if isdirectory(dir)
+    endif
+    let rp = split(&runtimepath, ',')
+    call insert(rp, dir, 1)
+    let &runtimepath = join(rp, ',')
     return
   endif
 
