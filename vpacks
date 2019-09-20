@@ -788,11 +788,11 @@ def parse_args():
 
     elif ( ACTION == 'log' ):
         n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else '-1'
-        EXE = 'log %s' % n
+        EXE = 'log %s --' % n
 
     elif ( ACTION == 'graph' ):
         n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else ''
-        EXE = 'log %s --graph --oneline' % n
+        EXE = 'log %s --graph --oneline --' % n
 
     elif ( ACTION in ['git', 'exe'] ):
         if ( not args ):
