@@ -66,6 +66,9 @@ install in the start subdirectory. Read the help for details.
 
 ## Vim support plugin
 
+Some VimL commands are included for convenience, even if they aren't necessary
+to use the plugins. See `:help vpacks`
+
 You can run the shell command from vim, in a terminal buffer if supported:
 
     Vpacks [arguments]
