@@ -29,7 +29,7 @@ command! PacksInstall call vpacks#install_packages()
 " a bang! means that the packadd command must be called *without* bang
 " that is, the package will be added immediately to the runtimepath.
 fun! s:add_package(bang, ...)
-  let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
+  let [packs, errors, add] = [g:vpacks.packages, g:vpacks.errors, 0]
   try
     let url     = split(a:000[0], '/')
     let name    = len(url) == 1 ? url[0] : url[-1]
@@ -43,11 +43,30 @@ fun! s:add_package(bang, ...)
   catch
     call add(errors, 'Invalid package: '. string(a:000[0]))
   endtry
-  if !empty(options) && !has_key(options, 'is_lazy')
-    call s:options(name, options)
-  else
-    call s:add(name, a:000[0], has_key(options, 'is_lazy'), a:bang)
+
+  " package has been already processed, now it's being lazy loaded
+  if has_key(options, 'is_lazy')
+    return s:add(name, a:000[0], 1, a:bang)
   endif
+
+  " package can't be loaded for failing precondition
+  if has_key(options, 'has') && !has(options.has)
+    return
+  endif
+
+  " a function must be called before processing the package
+  if has_key(options, 'call')
+    exe 'call' options.call . '()'
+  endif
+
+  " special options, lazy loading
+  for opt in keys(options)
+    if index(['dir', 'on', 'for'], opt) >= 0
+      return s:options(name, options)
+    endif
+  endfor
+
+  call s:add(name, a:000[0], 0, a:bang)
 endfun
 
 "------------------------------------------------------------------------------
