@@ -71,6 +71,7 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
   'dir'     can't be managed, but add to runtimepath         `{'dir': '~/.fzf'}`
   'call'    call a function just before loading the package  `{'call': 'Func'}`
   'has'     load if has(condition) is satisfied              `{'has': 'nvim'}`
+  'shallow' when installing, disable shallow cloning         `{'shallow': 0}`
 
                                                                  *:PacksCheck*
 :PacksCheck
