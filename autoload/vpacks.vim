@@ -26,7 +26,7 @@ fun! vpacks#check_packages() abort
   put =''
   for pack in sort(keys(packs))
     let status  = ['FAIL', 'OK', 'LAZY'][packs[pack].status]
-    let url     = packs[pack].url
+    let url     = s:pad(packs[pack].url, 40)
     let options = empty(packs[pack].options) ? '-'
           \     : string(filter(packs[pack].options, 'v:key != "is_lazy"'))
     let string  = printf("\t%-30s\t%4s\t%-40s\t%s", pack, status, url, options)
@@ -118,3 +118,14 @@ fun! vpacks#lazy_plug(name, plug) abort
   endif
 endfun
 
+"------------------------------------------------------------------------------
+
+fun! s:pad(t, n) abort
+  if len(a:t) > a:n
+    return a:t[:(a:n-1)]."…"
+  else
+    let spaces = a:n - len(a:t)
+    let spaces = printf("%".spaces."s", "")
+    return a:t.spaces
+  endif
+endfun
