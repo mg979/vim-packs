@@ -78,8 +78,16 @@ fun! s:add(name, url, lazy, bang) abort
     exe cmd a:name
     let packs[a:name].status = 1
   catch
-    let packs[a:name].status = 0
-    call add(errors, 'Could not add package: '. a:url)
+    let nogit = substitute(a:name, '\.git$', '', '')
+    let packs[nogit] = copy(packs[a:name])
+    unlet packs[a:name]
+    try
+      exe cmd nogit
+      let packs[nogit].status = 1
+    catch
+      let packs[nogit].status = 0
+      call add(errors, 'Could not add package: '. a:url)
+    endtry
   endtry
   if a:lazy
     exe 'silent! autocmd!  vpacks-'.a:name
