@@ -389,7 +389,7 @@ class Packdir():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
             )
-            repo.path = packdir + SEP + repo.name
+            repo.path = packdir + repo.name
             PROCESSING.append(repo)
             if not ASYNC:
                 wait(repo)
@@ -497,7 +497,7 @@ class Repo():
 
             elif re.search('^https?://', self.arg):
                 self.address = re.sub('/?$', '', self.arg)
-                self.name = re.sub('.*/', '', self.address)
+                self.name = re.sub('.*/|(\.git)?/?$', '', self.address)
                 self.user = re.match('.*/([^/]+)/', self.address).group(1)
         except:
             return False

@@ -116,8 +116,8 @@ command line, or with `Vpacks update` from vim.
   " a local plugin can still be updated, if it is a valid repo with remotes
   Pack 'vim-fugitive'
 
-  " lazy load plugins for specific filetypes
-  Pack 'davidhalter/jedi-vim', {'for': 'python'}
+  " lazy load plugins for specific filetypes, disable shallow cloning
+  Pack 'davidhalter/jedi-vim', {'for': 'python', 'shallow': 0}
 
   " lazy load plugins on specific commands
   Pack 'Olical/vim-enmasse', { 'on': 'EnMasse' }
