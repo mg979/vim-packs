@@ -33,8 +33,9 @@ ONLY_START      = False
 PACKS           = {}
 PROCESSING      = []
 QUEUE           = []
+SHALLOW         = True
 SHOW_SIZE       = False
-TIMEOUT         = 15
+TIMEOUT         = 0
 WARNINGS        = []
 
 COLORS = {
@@ -377,9 +378,13 @@ class Packdir():
     def install(self, repo):
         if not self.has(repo.name):
             packdir = self.path + _start_or_opt_()
+            cmd = ['git', 'clone', '--recursive']
+            if SHALLOW:
+                cmd.append('--depth')
+                cmd.append('1')
+                cmd.append('--shallow-submodules')
             repo.process = subprocess.Popen(
-                ['git', 'clone', '--depth', '1',
-                 '--shallow-submodules', repo.address],
+                cmd + [repo.address],
                 cwd=packdir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
@@ -491,7 +496,7 @@ class Repo():
                     return False
 
             elif re.search('^https?://', self.arg):
-                self.address = re.sub('(\.git)?/?$', '', self.arg)
+                self.address = re.sub('/?$', '', self.arg)
                 self.name = re.sub('.*/', '', self.address)
                 self.user = re.match('.*/([^/]+)/', self.address).group(1)
         except:
@@ -537,8 +542,8 @@ def print_help():
         ['-no',         'no output (for use inside scripts)'],
         ['-na',         'no async update/cloning'],
         ['-ps',         'print size for "list" subcommand'],
-        ['-time',       'timeout for operations (default 15s)'],
-        ['-notime',     'no timeout, and no async'],
+        ['-time',       'timeout in seconds for operations (default 0)'],
+        ['-full',       'do not make shallow clones'],
         ['-opt',        'command only considers opt packages'],
         ['-start',      'command only considers start packages'],
     ]
@@ -724,19 +729,19 @@ def walk_arg(arg):
 def parse_args():
     """Parse arguments."""
     global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR, HELP
-    global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT
+    global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW
     args = sys.argv[1:]
 
     while ( args ):
         if (args[0] in ['-h', '-nd', '-nc', '-ps', '-no',
-                        '-notime', '-opt', '-start']):
+                        '-full', '-opt', '-start']):
 
             if   ( args[0] == '-h'      ): HELP = True
             elif ( args[0] == '-nd'     ): DECO = False
             elif ( args[0] == '-nc'     ): COLOR = False
             elif ( args[0] == '-ps'     ): SHOW_SIZE = True
             elif ( args[0] == '-no'     ): NO_OUTPUT = True
-            elif ( args[0] == '-notime' ): TIMEOUT, ASYNC = None, False
+            elif ( args[0] == '-full'   ): SHALLOW = False
             elif ( args[0] == '-opt'    ): ONLY_OPT = True
             elif ( args[0] == '-start'  ): ONLY_START = True
 
@@ -745,8 +750,6 @@ def parse_args():
 
         if ( args[0] == '-na' ):
             ASYNC = False
-            if TIMEOUT and TIMEOUT == 15:
-                TIMEOUT = 20
             del args[0]
             continue
 
