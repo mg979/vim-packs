@@ -13,15 +13,6 @@ fun! vpacks#check_packages() abort
   exe tabpagenr()-1 . 'tabnew'
   setlocal bt=nofile bh=wipe noswf nobl nowrap
 
-  syn keyword VpacksOk OK
-  syn keyword VpacksLazy LAZY
-  syn keyword VpacksFail FAIL
-  syn match   VpacksPack '^\%>1l.\{30}'
-  hi default link VpacksOk diffAdded
-  hi default link VpacksFail diffRemoved
-  hi default link VpacksPack Special
-  hi default link VpacksLazy Constant
-
   call setline(1, printf("%-30s\tStatus\t\t%-38s\tOptions", 'Packages', 'Repo'))
   put =''
   for pack in sort(keys(packs))
@@ -33,6 +24,16 @@ fun! vpacks#check_packages() abort
     put =string
   endfor
   call append(line('$'), '')
+
+  syn keyword VpacksOk OK
+  syn keyword VpacksLazy LAZY
+  syn keyword VpacksFail FAIL
+  exe 'syn match   VpacksPack /^\%>1l\%<'.line('$').'l.\{30}/'
+  hi default link VpacksOk diffAdded
+  hi default link VpacksFail diffRemoved
+  hi default link VpacksPack Special
+  hi default link VpacksLazy Constant
+
   if empty(errors)
     call append(line('$'), 'No errors')
     1
