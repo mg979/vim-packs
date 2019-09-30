@@ -79,8 +79,10 @@ fun! s:add(name, url, lazy, bang) abort
     let packs[a:name].status = 1
   catch
     let nogit = substitute(a:name, '\.git$', '', '')
-    let packs[nogit] = copy(packs[a:name])
-    unlet packs[a:name]
+    if nogit != a:name
+      let packs[nogit] = copy(packs[a:name])
+      unlet packs[a:name]
+    endif
     try
       exe cmd nogit
       let packs[nogit].status = 1
