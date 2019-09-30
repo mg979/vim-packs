@@ -52,13 +52,21 @@ fun! vpacks#install_packages() abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
   let to_install = filter(copy(packs),
         \'!v:val.status && v:val.url!="" && !has_key(v:val.options, "dir")')
-  let s:urls = map(keys(to_install), 'to_install[v:val].url')
-  if empty(s:urls)
+
+  if empty(map(keys(to_install), 'to_install[v:val].url'))
     echo '[vpacks] no packages to install'
     return
   endif
-  let sl = '[vpacks] Installing packages, please wait...'
-  call vpacks#run(0, 'install opt ' . join(s:urls), sl)
+
+  for p in keys(to_install)
+    let pack = packs[p]
+    let cmd = 'install opt '
+    if has_key(pack.options, 'shallow') && !pack.options.shallow
+      let cmd = '-full ' . cmd
+    endif
+    let sl = '[vpacks] Installing ' . p . ', please wait...'
+    call vpacks#run(0, cmd . pack.url, sl)
+  endfor
 endfun
 
 "------------------------------------------------------------------------------
