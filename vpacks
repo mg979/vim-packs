@@ -93,7 +93,7 @@ class Package():
                 }[action]()
 
     def packdir(self):
-        return re.sub(_opt_+'|'+_start_ + self.name + '$', '', self.path)
+        return re.sub('('+_opt_+'|'+_start_+')' + self.name + '$', '', self.path)
 
     def is_opt(self):
         return re.search(_opt_ + self.name + '$', self.path)
