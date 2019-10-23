@@ -7,21 +7,21 @@ A light command-line package manager for vim 8 (or nvim), written in python.
 -------------------------------------------------------------------------------
 
 ## Installation
+```sh
+mkdir ~/.vim/pack/vpacks/opt
+cd ~/.vim/pack/vpacks/opt
+git clone https://github.com/mg979/vim-packs
+```
+Then in your vimrc:
 
-Put the python executable somewhere (preferably in your path), then you can run
-it from the terminal. Tested in Linux only (could work in mintty too).
+    packadd vim-packs
 
-If you want tab completion, also source the optional shell script in your
+If you want shell completion, also source the optional shell script in your
 .bashrc:
 
-    source path/to/vpacks.sh
+    source ~/.vim/pack/vpacks/opt/vim-packs/vpacks.sh
 
-You could also use it to install it in the `pack` directory, so that it will
-update itself with the other plugins. First download the script, then run it:
-
-    ./vpacks install mg979/vim-packs
-
-You should then make a link to the executable in a directory in your path:
+You should then make a link to the executable in a directory in your path, eg:
 
     ln -s ~/.vim/pack/vpacks/opt/vim-packs/vpacks ~/.local/bin/vpacks
 
@@ -115,11 +115,11 @@ Pack 'mhinz/vim-grepper', { 'on': ['Grepper', '<plug>(GrepperOperator)'] }
 " not a package, but add to runtimepath anyway, cannot be installed or updated
 Pack 'junegunn/fzf', { 'dir': '~/.fzf' }
 
-" infos about added package, and errors about missing packages
-PacksCheck
+" installed packages overview, and errors about missing packages
+:PacksCheck
 
 " try to install missing packages (it won't work with local plugins)
-PacksInstall
+:PacksInstall
 ```
 
 TODO: improve bash completion, post-install/update hooks, etc.
