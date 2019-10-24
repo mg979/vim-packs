@@ -50,24 +50,50 @@ endfun
 "------------------------------------------------------------------------------
 
 fun! vpacks#install_packages() abort
+  if !executable('sh')
+    echo '[vpacks] sh executable is needed'
+    return
+  endif
+
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
   let to_install = filter(copy(packs),
-        \'!v:val.status && v:val.url!="" && !has_key(v:val.options, "dir")')
+        \'v:val.status != 1 && v:val.url!="" && !has_key(v:val.options, "dir")')
 
   if empty(map(keys(to_install), 'to_install[v:val].url'))
     echo '[vpacks] no packages to install'
     return
   endif
 
+  let lines = []
   for p in keys(to_install)
     let pack = packs[p]
     let cmd = 'install opt '
     if has_key(pack.options, 'shallow') && !pack.options.shallow
       let cmd = '-full ' . cmd
     endif
-    let sl = '[vpacks] Installing ' . p . ', please wait...'
-    call vpacks#run(0, cmd . pack.url, sl)
+    call add(lines, 'vpacks ' . cmd . pack.url)
   endfor
+  call s:run(lines, '[vpacks] Installing packages, please wait...')
+endfun
+
+"------------------------------------------------------------------------------
+
+fun! s:run(lines, sl) abort
+  let tfile = tempname()
+  call writefile(a:lines, tfile)
+  if get(g:, 'vpacks_force_true_terminal', 0)
+    exe '!sh' . tfile
+  elseif has('nvim')
+    vnew
+    setlocal bt=nofile bh=wipe noswf nobl
+    exe 'terminal sh' tfile
+    let &l:statusline = a:sl
+  elseif has('terminal')
+    exe 'vertical terminal ++noclose ++norestore sh' tfile
+    let &l:statusline = a:sl
+  else
+    exe '!sh' . tfile
+  endif
 endfun
 
 "------------------------------------------------------------------------------
