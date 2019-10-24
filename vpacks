@@ -329,6 +329,10 @@ class Packdir():
                 error("Invalid directory, aborting.")
             os.makedirs(self.path + _opt_)
             os.makedirs(self.path + _start_)
+        if not os.path.exists(self.path + _opt_):
+            os.makedirs(self.path + _opt_)
+        if not os.path.exists(self.path + _start_):
+            os.makedirs(self.path + _start_)
 
     def has(self, pack, in_opt=False, in_start=False):
         """Check if package is contained in this packdir."""
