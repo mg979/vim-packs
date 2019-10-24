@@ -71,6 +71,9 @@ fun! vpacks#install_packages() abort
     if has_key(pack.options, 'shallow') && !pack.options.shallow
       let cmd = '-full ' . cmd
     endif
+    if !empty(get(pack.options, 'pdir', ''))
+      let cmd .= 'dir='.pack.options.pdir.' '
+    endif
     call add(lines, 'vpacks ' . cmd . pack.url)
   endfor
   call s:run(lines, '[vpacks] Installing packages, please wait...')

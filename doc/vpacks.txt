@@ -68,6 +68,7 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
                                                                       example~
   'for'     lazy load for filetype                           `{'for': 'python'}`
   'on'      lazy load when ex command is run                 `{'on': 'Explore'}`
+  'pdir'    install in pack/{pdir}/, not in pack/vpacks/     `{'pdir': 'tpope'}`
   'dir'     can't be managed, but add to runtimepath         `{'dir': '~/.fzf'}`
   'call'    call a function just before loading the package  `{'call': 'Func'}`
   'has'     load if has(condition) is satisfied              `{'has': 'nvim'}`
@@ -115,6 +116,9 @@ command line, or with `Vpacks update` from vim.
 
   " a local plugin can still be updated, if it is a valid repo with remotes
   Pack 'vim-fugitive'
+
+  " install in specific pack/ subdirectory
+  Pack 'tpope/vim-surround', {'pdir': 'tpope'}
 
   " lazy load plugins for specific filetypes, disable shallow cloning
   Pack 'davidhalter/jedi-vim', {'for': 'python', 'shallow': 0}
