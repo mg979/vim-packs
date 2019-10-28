@@ -7,6 +7,10 @@
 " Modified:    gio 29 agosto 2019 23:22:50
 " ========================================================================///
 
+let s:vpacks = has('win32')
+      \      ? 'python3 ' . fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
+      \      : fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
+
 fun! vpacks#check_packages() abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
 
@@ -74,29 +78,9 @@ fun! vpacks#install_packages() abort
     if !empty(get(pack.options, 'pdir', ''))
       let cmd .= 'dir='.pack.options.pdir.' '
     endif
-    call add(lines, 'vpacks ' . cmd . pack.url)
+    call add(lines, tr(s:vpacks, '\', '/') . ' ' . cmd . pack.url)
   endfor
-  call s:run(lines, '[vpacks] Installing packages, please wait...')
-endfun
-
-"------------------------------------------------------------------------------
-
-fun! s:run(lines, sl) abort
-  let tfile = tempname()
-  call writefile(a:lines, tfile)
-  if get(g:, 'vpacks_force_true_terminal', 0)
-    exe '!sh' . tfile
-  elseif has('nvim')
-    vnew
-    setlocal bt=nofile bh=wipe noswf nobl
-    exe 'terminal sh' tfile
-    let &l:statusline = a:sl
-  elseif has('terminal')
-    exe 'vertical terminal ++noclose ++norestore sh' tfile
-    let &l:statusline = a:sl
-  else
-    exe '!sh' . tfile
-  endif
+  call s:run_install(lines, '[vpacks] Installing packages, please wait...')
 endfun
 
 "------------------------------------------------------------------------------
@@ -104,17 +88,17 @@ endfun
 fun! vpacks#run(bang, cmd, ...) abort
   echo "\r"
   if a:bang || get(g:, 'vpacks_force_true_terminal', 0)
-    exe '!vpacks' a:cmd
+    exe '!' . s:vpacks . ' ' . a:cmd
   elseif has('nvim')
     vnew
     setlocal bt=nofile bh=wipe noswf nobl
-    exe 'terminal vpacks' a:cmd
+    exe 'terminal ' . s:vpacks . ' ' . a:cmd
     let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
   elseif has('terminal')
-    exe 'vertical terminal ++noclose ++norestore vpacks' a:cmd
+    exe 'vertical terminal ++noclose ++norestore ' . s:vpacks . ' ' . a:cmd
     let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
   else
-    exe '!vpacks' a:cmd
+    exe '!' . s:vpacks . ' ' . a:cmd
   endif
 endfun
 
@@ -156,9 +140,12 @@ fun! vpacks#lazy_plug(name, plug) abort
   endif
 endfun
 
-"------------------------------------------------------------------------------
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Helpers
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! s:pad(t, n) abort
+  " Make a string fit. {{{1
   if len(a:t) > a:n
     return a:t[:(a:n-1)]."…"
   else
@@ -166,4 +153,25 @@ fun! s:pad(t, n) abort
     let spaces = printf("%".spaces."s", "")
     return a:t.spaces
   endif
-endfun
+endfun " }}}
+
+fun! s:run_install(lines, sl) abort
+  " Run install command in terminal. {{{1
+  let tfile = tempname()
+  call writefile(a:lines, tfile)
+  if get(g:, 'vpacks_force_true_terminal', 0)
+    exe '!sh' . tfile
+  elseif has('nvim')
+    vnew
+    setlocal bt=nofile bh=wipe noswf nobl
+    exe 'terminal sh' tfile
+    let &l:statusline = a:sl
+  elseif has('terminal')
+    exe 'vertical terminal ++noclose ++norestore sh' tfile
+    let &l:statusline = a:sl
+  else
+    exe '!sh' . tfile
+  endif
+endfun " }}}
+
+" vim: et sw=2 ts=2 sts=2 fdm=marker
