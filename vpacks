@@ -53,7 +53,8 @@ COLORS = {
     'cyan':        '\33[96m',
 }
 
-UP_TO_DATE = re.compile('Already up-to-date.')
+UP_TO_DATE = re.compile('Already up-to-date.') \
+    if os.name != 'nt' else re.compile('Already up to date.')
 
 SEP = os.sep.replace('\\', '\\\\')
 _start_ = SEP + 'start' + SEP
@@ -364,7 +365,8 @@ class Packdir():
         if ( ONLY_START and subdir == _opt_ ):
             return []
         if ( os.path.exists(self.path + subdir) ):
-            return glob.iglob(self.path + subdir + '*')
+            return [d for d in glob.iglob(self.path + subdir + '*')
+                    if os.path.isdir(d)]
         return []
 
     def output(self, output, subdir):
