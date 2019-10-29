@@ -214,10 +214,11 @@ class Package():
 
     def helptags(self):
         """Update helptags for package."""
-        docdir = (self.path + SEP + 'doc').replace(' ', '\ ')
+        docdir = (self.path + SEP + 'doc')
         if os.path.isdir(docdir):
             subprocess.run(
-                    'vim -nEs -c "silent! helptags %s | q"' % docdir, shell=True)
+                'vim -nEs -c "silent! helptags %s | q"'
+                % vimescape(docdir), shell=True)
 
     def update(self):
         self.process = self.async_shell('git pull --ff-only')
@@ -685,6 +686,13 @@ def _start_or_opt_():
     """Return /start/ or /opt/, with os separators."""
     return _opt_ if INSTOPT else _start_
 
+
+def vimescape(s):
+    """Escape filename for the shell."""
+    if os.name == 'nt':
+        return '"' + s.replace('\\\\', '/') + '"'
+    else:
+        return s.replace(' ', '\ ')
 
 def list_backup_dir():
     backups = os.listdir(BACKUPDIR)
