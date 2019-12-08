@@ -7,7 +7,7 @@
 " Modified:    gio 29 agosto 2019 23:22:50
 " ========================================================================///
 
-let s:vpacks = has('win32')
+let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
       \      ? 'python3 ' . fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
       \      : fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
 
@@ -16,6 +16,7 @@ fun! vpacks#check_packages() abort
 
   exe tabpagenr()-1 . 'tabnew'
   setlocal bt=nofile bh=wipe noswf nobl nowrap
+  setfiletype vpackslist
 
   call setline(1, printf("%-30s\tStatus\t\t%-38s\tOptions", 'Packages', 'Repo'))
   put =''
@@ -29,14 +30,7 @@ fun! vpacks#check_packages() abort
   endfor
   call append(line('$'), '')
 
-  syn keyword VpacksOk OK
-  syn keyword VpacksLazy LAZY
-  syn keyword VpacksFail FAIL
-  exe 'syn match   VpacksPack /^\%>1l\%<'.line('$').'l.\{30}/'
-  hi default link VpacksOk diffAdded
-  hi default link VpacksFail diffRemoved
-  hi default link VpacksPack Special
-  hi default link VpacksLazy Constant
+  nnoremap <buffer> I :call <sid>install_pack()<cr>
 
   if empty(errors)
     call append(line('$'), 'No errors')
@@ -70,15 +64,8 @@ fun! vpacks#install_packages() abort
 
   let lines = []
   for p in keys(to_install)
-    let pack = packs[p]
-    let cmd = 'install opt '
-    if has_key(pack.options, 'shallow') && !pack.options.shallow
-      let cmd = '-full ' . cmd
-    endif
-    if !empty(get(pack.options, 'pdir', ''))
-      let cmd .= 'dir='.pack.options.pdir.' '
-    endif
-    call add(lines, tr(s:vpacks, '\', '/') . ' ' . cmd . pack.url)
+    let cmd = s:install_cmd(packs[p])
+    call add(lines, tr(s:vpacks, '\', '/') . ' ' . cmd)
   endfor
   call s:run_install(lines, '[vpacks] Installing packages, please wait...')
 endfun
@@ -91,7 +78,7 @@ fun! vpacks#run(bang, cmd, ...) abort
     exe '!' . s:vpacks . ' ' . a:cmd
   elseif has('nvim')
     vnew
-    setlocal bt=nofile bh=wipe noswf nobl
+    setlocal bt=nofile bh=hide noswf nobl
     exe 'terminal ' . s:vpacks . ' ' . a:cmd
     let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
   elseif has('terminal')
@@ -163,7 +150,7 @@ fun! s:run_install(lines, sl) abort
     exe '!sh' . tfile
   elseif has('nvim')
     vnew
-    setlocal bt=nofile bh=wipe noswf nobl
+    setlocal bt=nofile bh=hide noswf nobl
     exe 'terminal sh' tfile
     let &l:statusline = a:sl
   elseif has('terminal')
@@ -171,6 +158,27 @@ fun! s:run_install(lines, sl) abort
     let &l:statusline = a:sl
   else
     exe '!sh' . tfile
+  endif
+endfun " }}}
+
+fun! s:install_cmd(pack)
+  " Generate the command for installation, based on pack options. {{{1
+  let cmd = 'install opt '
+  if has_key(a:pack.options, 'shallow') && !a:pack.options.shallow
+    let cmd = '-full ' . cmd
+  endif
+  if !empty(get(a:pack.options, 'pdir', ''))
+    let cmd .= 'dir='.a:pack.options.pdir.' '
+  endif
+  return cmd . a:pack.url
+endfun " }}}
+
+fun! s:install_pack()
+  let pack = g:vpacks.packages[split(getline('.'))[0]]
+  if !empty(pack.url)
+    call vpacks#run(0, s:install_cmd(pack))
+  else
+    echo '[vpacks] not possible to install' pack[0]
   endif
 endfun " }}}
 
