@@ -61,6 +61,13 @@ _start_ = SEP + 'start' + SEP
 _opt_ = SEP + 'opt' + SEP
 _pack_ = SEP + 'pack' + SEP
 
+if shutil.which('vim') is not None:
+    VIM = 'vim '
+elif shutil.which('nvim') is not None:
+    VIM = 'nvim '
+else:
+    VIM = ''
+
 
 #------------------------------------------------------------------------------
 # Package class
@@ -214,10 +221,12 @@ class Package():
 
     def helptags(self):
         """Update helptags for package."""
+        if not VIM:
+            return
         docdir = (self.path + SEP + 'doc')
         if os.path.isdir(docdir):
             subprocess.run(
-                'vim -nEs -c "silent! helptags %s | q"'
+                VIM + ' -nEs -c "silent! helptags %s | q"'
                 % vimescape(docdir), shell=True)
 
     def update(self):
