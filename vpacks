@@ -230,7 +230,8 @@ class Package():
                 % vimescape(docdir), shell=True)
 
     def update(self):
-        self.process = self.async_shell('git pull --ff-only')
+        self.process = self.async_shell(
+            'git pull --ff-only --recurse-submodules')
         PROCESSING.append(self)
         if not ASYNC:
             wait(self)
