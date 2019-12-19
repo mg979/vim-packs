@@ -81,11 +81,34 @@ fun! vpacks#run(bang, cmd, ...) abort
     setlocal bt=nofile bh=hide noswf nobl
     exe 'terminal ' . s:vpacks . ' ' . a:cmd
     let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
+    call s:setftype()
   elseif has('terminal')
-    exe 'vertical terminal ++noclose ++norestore ' . s:vpacks . ' ' . a:cmd
-    let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
+    let opts = {'vertical': 1,
+          \     'exit_cb': { c,j -> timer_start(100, 'vpacks#statusline') },
+          \     'term_name': 'vpacks ' . a:cmd}
+    call term_start(s:vpacks . ' ' . a:cmd, opts)
+    let wait = '%#Search# Please wait... %#StatusLine# '
+    let &l:statusline = a:0 ? a:1 : (wait . 'vpacks ' . a:cmd)
+    let s:cmd = a:cmd
+    call s:setftype()
   else
     exe '!' . s:vpacks . ' ' . a:cmd
+  endif
+endfun
+
+fun! s:setftype() abort
+  120wincmd |
+  setfiletype vpacks
+endfun
+
+fun! vpacks#statusline(...)
+  let finish =  '%#IncSearch# FINISHED %#StatusLine# '
+  let &l:statusline =  finish . 'vpacks ' . s:cmd
+  if &ft == 'vpacks'
+    setlocal modifiable
+    silent! %s/^---\+/―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――/
+    setlocal nomodifiable
+    setlocal nomodified
   endif
 endfun
 
