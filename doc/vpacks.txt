@@ -79,12 +79,13 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
 
     Open a diagnostic buffer, that shows which packages have been loaded,
     which are being lazy loaded, their options, and errors if any occurred.
+    Pressing `I` in an uninstalled package will try to install it, if the url
+    is valid.
 
                                                                *:PacksInstall*
 :PacksInstall
 
-    Install all missing packages that have been added with tthe |Pack|
-    command.
+    Install all missing packages that have been added with the |Pack| command.
 
                                                                      *:Vpacks*
 :Vpacks {args}
