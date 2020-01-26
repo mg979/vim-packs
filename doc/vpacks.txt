@@ -2,7 +2,7 @@
 
 Author: mg979
 
-For Vim version 8.0 and above.
+For Vim version 8.0 and above (and `neovim`).
 
 ==============================================================================
 
@@ -17,14 +17,14 @@ For Vim version 8.0 and above.
 1. Overview
 
 These are not the instructions for the package manager itself.
-Run run `vpacks -h` in a terminal for that.
+Run `vpacks -h` in a terminal for that.
 
 The following commands aren't necessary for the plugins to work, if
-you put them in your `pack/*/start/` directories. If you use these commands,
-you should keep all the packages that you want to manage with them in the
-`pack/*/opt/` directories.
+you put them in your `pack/*/start/` directories. But if you decide to use
+these commands, you should keep all the packages that you want to manage from
+within Vim in the `pack/*/opt/` directories.
 
-Only use them if:
+You could want to do this for one of the following reasons:
 
 * you want to lazy load some plugins
 * you want greater control on which plugins to load
@@ -50,7 +50,7 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
       in the part of the vim initialization where packages/plugins are loaded.
       That is, the behaviour is reversed: `Pack` behaves like `packadd!` and
       `Pack!` like `packadd`. This is so, because the `Pack` command makes
-      sense if put in the vimrc.
+      more sense if put in the vimrc.
 
 `url`: can have several forms:
 
@@ -60,7 +60,7 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
   `gl/user/plugin`  a GitLab repo
   `http(s)://...`   any repo
 
-  It's not necessary for the repo to be valid, for the plugin to be loaded. It
+  It's not necessary for the url to be valid, for the plugin to be loaded. It
   will only be necessary if you want to install the plugins from vim, rather
   than the command line. See |PacksInstall|.
 
@@ -70,17 +70,16 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
   'on'      lazy load when ex command is run                 `{'on': 'Explore'}`
   'pdir'    install in pack/{pdir}/, not in pack/vpacks/     `{'pdir': 'tpope'}`
   'dir'     can't be managed, but add to runtimepath         `{'dir': '~/.fzf'}`
-  'call'    call a function just before loading the package  `{'call': 'Func'}`
   'has'     load if has(condition) is satisfied              `{'has': 'nvim'}`
-  'shallow' when installing, disable shallow cloning         `{'shallow': 0}`
+  'full'    when installing, perform non-shallow cloning     `{'full': 1}`
 
                                                                  *:PacksCheck*
 :PacksCheck
 
     Open a diagnostic buffer, that shows which packages have been loaded,
     which are being lazy loaded, their options, and errors if any occurred.
-    Pressing `I` in an uninstalled package will try to install it, if the url
-    is valid.
+    Pressing `I` on the line of an uninstalled package will try to install it,
+    if the url is valid.
 
                                                                *:PacksInstall*
 :PacksInstall
@@ -104,15 +103,14 @@ command line, or with `Vpacks update` from vim.
 >
   " first add vpacks itself, so that commands will run
   " don't use bang, and be sure that vpacks is in a /opt directory
+  " see ':help initialization' for more infos
   packadd vim-packs
 
   " packadd! a plugin, complete with repo address
   Pack 'tpope/vim-surround'
 
   " packadd a plugin, complete with repo address
-  " note that the bang will cause the packadd command to be called *without* bang
-  " that means that the package will be immediately be added to the runtimepath
-  " and sourced, see ':help initialization'
+  " with bang the package will be immediately added to &rtp and sourced
   Pack! 'vim-airline/vim-airline'
 
   " a local plugin can still be updated, if it is a valid repo with remotes
@@ -122,7 +120,7 @@ command line, or with `Vpacks update` from vim.
   Pack 'tpope/vim-surround', {'pdir': 'tpope'}
 
   " lazy load plugins for specific filetypes, disable shallow cloning
-  Pack 'davidhalter/jedi-vim', {'for': 'python', 'shallow': 0}
+  Pack 'davidhalter/jedi-vim', {'for': 'python', 'full': 1}
 
   " lazy load plugins on specific commands
   Pack 'Olical/vim-enmasse', { 'on': 'EnMasse' }
@@ -130,7 +128,7 @@ command line, or with `Vpacks update` from vim.
   " also working with lists, and plugs
   Pack 'mhinz/vim-grepper', { 'on': ['Grepper', '<plug>(GrepperOperator)'] }
 
-  " not a package, but add to runtimepath anyway, cannot be installed or updated
+  " not a package, but add to &rtp anyway, cannot be installed or updated
   Pack 'junegunn/fzf', { 'dir': '~/.fzf' }
 
   " infos about added package, and errors about missing packages
@@ -139,10 +137,12 @@ command line, or with `Vpacks update` from vim.
   " load if has(condition) is satisfied
   Pack 'vim-airline/vim-airline', {'has': 'nvim'}
 
-  " call a function just before loading the package
-  Pack 'lifepillar/vim-mucomplete', {'call': 'MyFunc'}
-<
+  " update a specific package from Vim
+  Vpacks update vim-fugitive
 
+  " install a new package from Vim
+  Vpacks install tpope/vim-commentary
+<
 
 
 vim:tw=78:ts=8:ft=help:norl:

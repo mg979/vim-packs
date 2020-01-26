@@ -38,7 +38,8 @@ fun! s:add_package(bang, ...)
       let packs[name] = {
             \'status':  0,
             \'url':     len(url) == 1 ? '' : a:000[0],
-            \'options': options}
+            \'options': options,
+            \}
     endif
   catch
     call add(errors, 'Invalid package: '. string(a:000[0]))
@@ -54,15 +55,11 @@ fun! s:add_package(bang, ...)
     return
   endif
 
-  " a function must be called before processing the package
-  if has_key(options, 'call')
-    exe 'call' options.call . '()'
-  endif
-
   " special options, lazy loading
   for opt in keys(options)
     if index(['dir', 'on', 'for'], opt) >= 0
-      return s:options(name, options)
+      call s:options(name, options)
+      return
     endif
   endfor
 
@@ -115,13 +112,11 @@ fun! s:options(name, options) abort
   " 'on':  load on command/plug
 
   if index(keys(a:options), 'dir') >= 0
-    let dir = fnamemodify(a:options.dir, ':p')
-    let g:vpacks.packages[a:name].status = isdirectory(dir)
+    let dir = fnamemodify(expand(a:options.dir), ':p')
     if isdirectory(dir)
+      let g:vpacks.packages[a:name].status = 1
+      exe 'set runtimepath^='.escape(a:options.dir, ' ')
     endif
-    let rp = split(&runtimepath, ',')
-    call insert(rp, dir, 1)
-    let &runtimepath = join(rp, ',')
     return
   endif
 
