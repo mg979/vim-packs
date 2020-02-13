@@ -53,8 +53,7 @@ COLORS = {
     'cyan':        '\33[96m',
 }
 
-UP_TO_DATE = re.compile('Already up-to-date.') \
-    if os.name != 'nt' else re.compile('Already up to date.')
+UP_TO_DATE = re.compile('Already up.to.date.')
 
 SEP = os.sep.replace('\\', '\\\\')
 _start_ = SEP + 'start' + SEP
@@ -171,6 +170,10 @@ class Package():
             if updating:
                 if not ok:
                     name = '\n' + color('cyan', name, bold=True)
+                out = out.replace('error:', red('error:'))
+                out = out.replace('Aborting', red('Aborting'))
+                err = err.replace('error:', red('error:'))
+                err = err.replace('Aborting', red('Aborting'))
                 return name + out + err
             else:
                 return name + out
@@ -233,13 +236,14 @@ class Package():
         has_submodules = os.path.isfile(self.path + SEP + '.gitmodules')
         if has_submodules:
             self.shell('git submodule sync --recursive')
-            self.process = self.async_shell(
-                'git pull --ff-only --recurse-submodules')
-        else:
-            self.process = self.async_shell('git pull --ff-only')
+            self.shell('git submodule update --init --recursive')
+        self.process = self.async_shell('git pull --ff-only')
         PROCESSING.append(self)
         if not ASYNC:
             wait(self)
+        else:
+            # add a small delay to avoid too many connections in a short time
+            sleep(0.1)
 
     def terminal(self):
         subprocess.run(
@@ -730,7 +734,8 @@ def list_backup_dir():
 def wait(pack):
     """Wait for process to terminate, handle TimeoutError."""
     try:
-        pack.process.wait(timeout=TIMEOUT)
+        to = TIMEOUT if TIMEOUT else None
+        pack.process.wait(timeout=to)
     except TimeoutError:
         warn_timeout(pack.name)
 
