@@ -144,16 +144,16 @@ class Package():
         name = "%-30s" % (self.name + ': ')
         out, err = cmd
 
-        if err:
-            if ( err[:5] == 'fatal' ):
-                fatal = red('fatal')
-                rest = re.sub('\..*', '.', err.split('\n')[0][5:])
-                return name + fatal + rest + '\n'
-            elif updating and re.search('http', err.splitlines()[0]):
-                err += '\n'
-            else:
-                err = red(err.split('\n')[0])
-                return name + err + '\n'
+        if ( err[:5] == 'fatal' ):
+            rest = re.sub('\..*', '.', err.split('\n')[0][5:])
+            return name + red('fatal') + rest + '\n'
+
+        if err and not updating:
+            err = red(err.split('\n')[0])
+            return name + err + '\n'
+
+        if err and updating and re.search('http', err.splitlines()[0]):
+            err += '\n'
 
         if out:
             ok = False
@@ -174,12 +174,11 @@ class Package():
                 out = out.replace('Aborting', red('Aborting'))
                 err = err.replace('error:', red('error:'))
                 err = err.replace('Aborting', red('Aborting'))
-                return name + out + err
-            else:
-                return name + out
 
-        # neither stdout nor stderr
-        return ''
+        if out or err:
+            return name + out + err
+        else:
+            return ''
 
     #--------------------------------------------------------------------------
     # class commands: methods names have their correspective in Packdir class
