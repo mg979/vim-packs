@@ -2,6 +2,7 @@
 
 import glob
 import os
+from os.path import basename
 import re
 import subprocess
 import sys
@@ -323,7 +324,7 @@ class Package():
             subprocess.run(['mv', self.path, pdir + _opt_])
             PACKS['packs'][self.name] = pdir + _opt_ + self.name
         if not NO_OUTPUT and not silent:
-            Packdir(os.path.basename(pdir)).list(show_size=False)
+            Packdir(basename(pdir)).list(show_size=False)
 
     def move2start(self, silent=False):
         name = green(self.name)
@@ -337,7 +338,7 @@ class Package():
             subprocess.run(['mv', self.path, pdir + _start_])
             PACKS['packs'][self.name] = pdir + _start_ + self.name
         if not NO_OUTPUT and not silent:
-            Packdir(os.path.basename(pdir)).list(show_size=False)
+            Packdir(basename(pdir)).list(show_size=False)
 
 
 #------------------------------------------------------------------------------
@@ -378,11 +379,11 @@ class Packdir():
         """Check if package is contained in this packdir."""
         if not in_start:
             for p in self.walk(_opt_):
-                if os.path.basename(p) == pack:
+                if basename(p) == pack:
                     return p
         if not in_opt:
             for p in self.walk(_start_):
-                if os.path.basename(p) == pack:
+                if basename(p) == pack:
                     return p
 
     def header(self, path):
@@ -448,33 +449,33 @@ class Packdir():
 
     def cmd(self, action):
         for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).cmd(action), _opt_)
+            self.output(Package(basename(p)).cmd(action), _opt_)
         for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).cmd(action), _start_)
+            self.output(Package(basename(p)).cmd(action), _start_)
 
     def terminal(self):
         error('terminal: not allowed for pack directories')
 
     def list(self, show_size=None):
         for p in self.walk(_opt_):
-            self.output(Package(os.path.basename(p)).list(show_size), _opt_)
+            self.output(Package(basename(p)).list(show_size), _opt_)
         for p in self.walk(_start_):
-            self.output(Package(os.path.basename(p)).list(show_size), _start_)
+            self.output(Package(basename(p)).list(show_size), _start_)
 
     def update(self):
         for p in self.walk(_opt_):
-            Package(os.path.basename(p)).update()
+            Package(basename(p)).update()
         process_asynch(self, _opt_)
         for p in self.walk(_start_):
-            Package(os.path.basename(p)).update()
+            Package(basename(p)).update()
         process_asynch(self, _start_)
 
     def fetch(self):
         for p in self.walk(_opt_):
-            Package(os.path.basename(p)).fetch()
+            Package(basename(p)).fetch()
         process_asynch(self, _opt_)
         for p in self.walk(_start_):
-            Package(os.path.basename(p)).fetch()
+            Package(basename(p)).fetch()
         process_asynch(self, _start_)
 
     def move2opt(self):
@@ -483,7 +484,7 @@ class Packdir():
         if confirm("Move all packages in " + start + "\n%21s" % "to " + opt):
             os.makedirs(self.path + _opt_, exist_ok=True)
             for p in self.walk(_start_):
-                Package(os.path.basename(p)).move2opt(silent=True)
+                Package(basename(p)).move2opt(silent=True)
             self.list(show_size=False)
 
     def move2start(self):
@@ -492,7 +493,7 @@ class Packdir():
         if confirm("Move all packages in " + opt + "\n%21s" % "to " + start):
             os.makedirs(self.path + _start_, exist_ok=True)
             for p in self._walk(_opt_):
-                Package(os.path.basename(p)).move2start(silent=True)
+                Package(basename(p)).move2start(silent=True)
             self.list(show_size=False)
 
 
@@ -699,7 +700,7 @@ def find_packs():
         error('vpacks: packages directory not found')
 
     dirpaths      = glob.glob(PACKS['packdir'] + '*')
-    PACKS['dirs'] = {os.path.basename(folder): folder for folder in dirpaths}
+    PACKS['dirs'] = {basename(folder): folder for folder in dirpaths}
 
     if 'backup' in PACKS['dirs']:
         del PACKS['dirs']['backup']
@@ -714,7 +715,7 @@ def find_packs():
     PACKS['packs']  = {}
 
     for packpath in packpaths:
-        key = os.path.basename(packpath)
+        key = basename(packpath)
         if key in PACKS['packs']:
             WARNINGS.append(('duplicated package', key))
         else:
@@ -807,7 +808,7 @@ def walk_arg(arg):
     elif ( arg in PACKS['packs'] ):
         QUEUE.append(Package(arg))
     else:
-        error('Pack or pack directory not found.')
+        error('%s: Pack or pack directory not found.' % arg)
 
 
 def parse_args():
