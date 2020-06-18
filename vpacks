@@ -699,14 +699,11 @@ def find_packs():
     if not PACKS['packdir']:
         error('vpacks: packages directory not found')
 
-    dirpaths      = glob.glob(PACKS['packdir'] + '*')
-    PACKS['dirs'] = {basename(folder): folder for folder in dirpaths}
+    dirpaths = glob.glob(PACKS['packdir'] + '*')
+    dirpaths = [d for d in dirpaths if basename(d) not in ['backup', 'logs']]
 
-    if 'backup' in PACKS['dirs']:
-        del PACKS['dirs']['backup']
-
-    if 'logs' in PACKS['dirs']:
-        del PACKS['dirs']['logs']
+    PACKS['dirs'] = {basename(folder): folder for folder in dirpaths
+                     if os.path.isdir(folder)}
 
     # ignore the packages that have been moved in the backups directory
     bdir      = re.compile(PACKS['bkupdir'])
@@ -715,6 +712,8 @@ def find_packs():
     PACKS['packs']  = {}
 
     for packpath in packpaths:
+        if not os.path.isdir(packpath):
+            continue
         key = basename(packpath)
         if key in PACKS['packs']:
             WARNINGS.append(('duplicated package', key))
@@ -896,10 +895,8 @@ def parse_args():
     # if no args beyond the command, perform on all packages, in all dirs
     # otherwise perform on args (they could be single packages, or directories)
     if ( not args ):
-        for path in glob.iglob(PACKS['packdir'] + '*'):
-            if os.path.basename(path) == 'backup':
-                continue
-            walk_arg(os.path.basename(path))
+        for d in PACKS['dirs']:
+            walk_arg(d)
     else:
         for arg in args:
             walk_arg(arg)
