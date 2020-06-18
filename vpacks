@@ -245,9 +245,13 @@ class Package():
             sleep(0.1)
 
     def terminal(self):
-        subprocess.run(
-            ['exo-open', '--launch', 'TerminalEmulator',
-             '--working-directory', '%s' % self.path.replace(' ', '\ ')])
+        if os.name != 'nt':
+            subprocess.run(
+                ['exo-open', '--launch', 'TerminalEmulator',
+                 '--working-directory', '%s' % self.path.replace(' ', '\ ')],
+                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        else:
+            error('not in Windows')
 
     def status(self):
         cmd = self.shell('git status --porcelain')
