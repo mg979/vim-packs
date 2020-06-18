@@ -58,7 +58,6 @@ UP_TO_DATE = re.compile('Already up.to.date.')
 SEP = os.sep.replace('\\', '\\\\')
 _start_ = SEP + 'start' + SEP
 _opt_ = SEP + 'opt' + SEP
-_pack_ = SEP + 'pack' + SEP
 
 if shutil.which('vim') is not None:
     VIM = 'vim '
@@ -78,7 +77,7 @@ class Package():
     def __init__(self, name, pdir=None, restore_from_backup=False):
         self.name = name
         if restore_from_backup:
-            self.path = BACKUPDIR + SEP + name
+            self.path = PACKS['bkupdir'] + SEP + name
         elif pdir:
             self.path = PACKS['dirs'][pdir] + name
         else:
@@ -209,16 +208,16 @@ class Package():
 
     def restore(self):
         """Move package from backup directory, into packages directory."""
-        src = BACKUPDIR + SEP + self.name
+        src = PACKS['bkupdir'] + SEP + self.name
         if not os.path.exists(src):
             return red(self.name) + ' not in the backup directory'
-        dst = PACKS['vimdir'] + _pack_ + INSTDIR + _start_or_opt_()
+        dst = PACKS['packdir'] + INSTDIR + _start_or_opt_()
         shutil.move(src, dst)
         return green(self.name) + ' moved into directory ' + dst + '\n'
 
     def backup(self):
         """Move package into the backup directory."""
-        shutil.move(self.path, BACKUPDIR)
+        shutil.move(self.path, PACKS['bkupdir'])
         return green(self.name) + ' moved into the backup directory\n'
 
     def helptags(self):
@@ -336,7 +335,7 @@ class Packdir():
         if name in PACKS['dirs']:
             self.path = PACKS['dirs'][name]
         else:
-            self.path = PACKS['dirs'][name] = PACKS['vimdir'] + _pack_ + name
+            self.path = PACKS['dirs'][name] = PACKS['packdir'] + name
         self.is_package = False
         self.has_output_opt = False
         self.has_output_start = False
@@ -372,15 +371,7 @@ class Packdir():
     def header(self, path):
         if ( not DECO or not os.path.exists(path) or not os.listdir(path) ):
             return
-        if COLOR:
-            blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
-            log("\n" + blue + "─" * 67 + end)
-            log(bold + blue + "Packs in directory " + yelw + path + end)
-            log(blue + "─" * 67 + end + "\n")
-        else:
-            log("\n" + "-" * 67)
-            log("Packs in directory " + path)
-            log("-" * 67 + "\n")
+        term_header("Packs in directory", path)
 
     def walk(self, subdir):
         if ( ONLY_OPT and subdir == _start_ ):
@@ -674,20 +665,29 @@ def warning(msg, pack):
 
 def find_packs():
     """Find vim and package directories and basenames."""
-    global WARNINGS, BACKUPDIR
-    win             = os.path.expanduser('~\\vimfiles').replace('\\', '\\\\')
-    nwin            = os.path.expanduser('~/.vim')
-    PACKS['vimdir'] = win if os.path.exists(win) else nwin
-    BACKUPDIR       = PACKS['vimdir'] + _pack_ + 'backup'
-    dirpaths        = glob.glob(PACKS['vimdir'] + _pack_ + '*')
-    PACKS['dirs']   = {os.path.basename(folder): folder for folder in dirpaths}
+    global WARNINGS
+    for p in ['~\\vimfiles', '~/.vim', '~/.local/share/nvim',
+              '~/.local/share/nvim/site']:
+        path = os.path.expanduser(p).replace('\\', '\\\\')
+        if os.path.exists(path + SEP + 'pack'):
+            PACKS['basedir'] = path + SEP
+            PACKS['packdir'] = PACKS['basedir'] + 'pack' + SEP
+            PACKS['bkupdir'] = PACKS['packdir'] + 'backup' + SEP
+            break
+
+    if not PACKS['packdir']:
+        error('vpacks: packages directory not found')
+
+    dirpaths      = glob.glob(PACKS['packdir'] + '*')
+    PACKS['dirs'] = {os.path.basename(folder): folder for folder in dirpaths}
 
     if 'backup' in PACKS['dirs']:
         del PACKS['dirs']['backup']
 
-    bdir            = re.compile(BACKUPDIR)
-    packpaths       = glob.glob(PACKS['vimdir'] + _pack_ + '*%s*%s*' % (SEP, SEP))
-    packpaths       = list(filter(lambda pdir: not re.search(bdir, pdir), packpaths))
+    # ignore the packages that have been moved in the backups directory
+    bdir      = re.compile(PACKS['bkupdir'])
+    packpaths = glob.glob(PACKS['packdir'] + '*%s*%s*' % (SEP, SEP))
+    packpaths = list(filter(lambda pdir: not re.search(bdir, pdir), packpaths))
     PACKS['packs']  = {}
 
     for packpath in packpaths:
@@ -717,18 +717,11 @@ def vimescape(s):
         return s.replace(' ', '\ ')
 
 def list_backup_dir():
-    backups = os.listdir(BACKUPDIR)
+    backups = os.listdir(PACKS['bkupdir'])
     if not backups:
         log('No packages in the backup directory.')
-    elif COLOR:
-        blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
-        log("\n" + blue + "─" * 67 + end)
-        log(bold + blue + "Packs in directory " + yelw + BACKUPDIR + end)
-        log(blue + "─" * 67 + end + "\n")
-    elif DECO:
-        log("\n" + "─" * 67)
-        log("Packs in directory " + BACKUPDIR)
-        log("─" * 67 + "\n")
+    else:
+        term_header("Packs in directory", PACKS['bkupdir'])
     for pack in backups:
         log(pack)
     sys.exit()
@@ -746,6 +739,19 @@ def wait(pack):
 def warn_timeout(name):
     """Log warning when timeout has been reached."""
     log("%-30s" % (name + ': ') + red("timeout %ds" % int(TIMEOUT)))
+
+
+def term_header(string, path):
+    """Print a header in the terminal."""
+    if COLOR:
+        blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
+        log("\n" + blue + "─" * 67 + end)
+        log(bold + blue + string + " " + yelw + path + end)
+        log(blue + "─" * 67 + end + "\n")
+    else:
+        log("\n" + "-" * 67)
+        log(string + " " + path)
+        log("-" * 67 + "\n")
 
 
 #------------------------------------------------------------------------------
@@ -817,12 +823,12 @@ def parse_args():
         return
 
     elif ( ACTION == 'backup' ):
-        os.makedirs(BACKUPDIR, exist_ok=True)
+        os.makedirs(PACKS['bkupdir'], exist_ok=True)
         if ( not args ):
             list_backup_dir()
 
     elif ( ACTION == 'restore' ):
-        os.makedirs(BACKUPDIR, exist_ok=True)
+        os.makedirs(PACKS['bkupdir'], exist_ok=True)
         parse_restore(args)
         return
 
@@ -843,7 +849,7 @@ def parse_args():
     # if no args beyond the command, perform on all packages, in all dirs
     # otherwise perform on args (they could be single packages, or directories)
     if ( not args ):
-        for path in glob.iglob(PACKS['vimdir'] + _pack_ + '*'):
+        for path in glob.iglob(PACKS['packdir'] + '*'):
             if os.path.basename(path) == 'backup':
                 continue
             walk_arg(os.path.basename(path))
@@ -942,8 +948,8 @@ def install_packages():
 
         if repo.name in PACKS['packs']:
             name = green(repo.user + '/' + repo.name)
-            dr = PACKS['packs'][repo.name].replace(PACKS['vimdir'], '')
-            log(name + ': already installed in ..' + dr)
+            packdir = PACKS['packs'][repo.name]
+            log(name + ': already installed in ../' + packdir)
         elif not pdir.has(repo.name):
             pdir.install(repo)
         else:
