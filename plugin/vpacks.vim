@@ -32,8 +32,8 @@ fun! s:add_package(bang, ...)
   let [packs, errors, add] = [g:vpacks.packages, g:vpacks.errors, 0]
   try
     let url     = split(a:000[0], '/')
-    let name    = len(url) == 1 ? url[0] : url[-1]
-    let options = len(a:000) > 1 && type(a:2) == v:t_dict ? a:2 : {}
+    let name    = url[-1]
+    let options = get(a:000, 1, {})
     if !has_key(packs, name)
       let packs[name] = {
             \'status':  0,
@@ -42,7 +42,7 @@ fun! s:add_package(bang, ...)
             \}
     endif
   catch
-    call add(errors, 'Invalid package: '. string(a:000[0]))
+    return add(errors, 'Invalid package: '. string(a:000[0]))
   endtry
 
   " package has been already processed, now it's being lazy loaded

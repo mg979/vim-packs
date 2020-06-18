@@ -16,7 +16,7 @@ import json
 #------------------------------------------------------------------------------
 
 
-ACTIONS = [ 'list', 'update', 'status', 'verbose', 'web', 'git', 'exe', 'log',
+ACTIONS = [ 'list', 'update', 'dirty', 'verbose', 'web', 'git', 'exe', 'log',
             'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
             'helptags', 'backup', 'restore', 'terminal', 'logs']
 
@@ -96,7 +96,7 @@ class Package():
         return {
                 'verbose':  self.verbose,        'remotes': self.remotes,
                 'git':      self.git,            'exe':     self.exe,
-                'web':      self.web,            'status':  self.status,
+                'web':      self.web,            'dirty':   self.dirty,
                 'backup':   self.backup,         'restore': self.restore,
                 'helptags': self.helptags,       'logs':    self.logs,
                 }[action]()
@@ -276,7 +276,7 @@ class Package():
         else:
             error('not in Windows')
 
-    def status(self):
+    def dirty(self):
         cmd = self.shell('git status --porcelain')
         name = green(self.name)
         if cmd[1]:
@@ -447,7 +447,7 @@ class Packdir():
     def git(self):      self.cmd('git')
     def exe(self):      self.cmd('exe')
     def web(self):      self.cmd('web')
-    def status(self):   self.cmd('status')
+    def dirty(self):    self.cmd('dirty')
     def helptags(self): self.cmd('helptags')
     def backup(self):   self.cmd('backup')
     def restore(self):  self.cmd('restore')
@@ -560,8 +560,8 @@ def print_help():
         ['list',        'list packages'],
         ['update',      'update packages'],
         ['install',     'install packages from remote repos'],
-        ['status',      'list only packages with a dirty working tree'],
         ['verbose',     'verbose status (with diff)'],
+        ['dirty',       'list only packages with a dirty working tree'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
         ['terminal',    'open a new terminal at package directory'],
@@ -597,23 +597,30 @@ def print_help():
     options = options[:4] if not HELP else options[1:]
 
     instopts = [
+        ['opt',         'install in /opt directory rather than in /start (DEFAULT)'],
         ['start',       'install in /start directory rather than in /opt'],
-        ['opt',         'install in /opt directory rather than in /start'],
-        ['dir=DIR',     'set base installation directory for packages'],
+        ['dir=DIR',     'set base installation directory for packages (.vim/pack/DIR)'],
     ]
 
     examples = [
         ['List all packages in the pack/my_packs/*/* directories',
          'vpacks list my_packs'],
         ['Verbose status for selected packages',
-         'vpacks verbose visual-multi yanktools'],
+         'vpacks verbose plugin.vim vim-another-plugin'],
+        ['Install a package in the default ("vpacks") directory, as "opt" type',
+         'vpacks install mg979/vim-visual-multi'],
+        ['Install packages in specific directory, as "start" type',
+         'vpacks install dir=my_packs start mg979/vim-visual-multi'],
+        ['Read last update log',
+         'vpacks logs 0'],
         ['Run git command',
          'vpacks git "branch --list" my_packs'],
-        ['Install a package in the default ("vpacks") directory, as opt type',
-         'vpacks install opt mg979/visual-multi'],
-        ['Install packages in specific directory',
-         'vpacks install dir=my_packs mg979/visual-multi'],
+        ['Read last update errors',
+         'vpacks logs errors']
     ]
+
+    if not HELP:
+        examples = examples[:5]
 
     print()
     print("Usage:\tvpacks [options] COMMAND [pack | directory]")
@@ -1147,7 +1154,7 @@ def process_action():
     for q in QUEUE:
         actions = {
             'list':     q.list,          'update':     q.update,
-            'status':   q.status,        'verbose':    q.verbose,
+            'dirty':    q.dirty,         'verbose':    q.verbose,
             'remotes':  q.remotes,       'fetch':      q.fetch,
             'move2opt': q.move2opt,      'move2start': q.move2start,
             'git':      q.git,           'exe':        q.exe,
