@@ -145,21 +145,23 @@ class Package():
 
         name = "%-30s" % (self.name + ': ')
         out, err = cmd.copy()
+        ok = False
+
+        if err:
+            # limit most error messages to the first line of the error
+            # the full messages can be read with 'vpacks logs errors'
+            errline = err.split('\n')[0]
 
         if ( err[:5] == 'fatal' ):
-            rest = re.sub('\..*', '.', err.split('\n')[0][5:])
-            return name + red('fatal') + rest + '\n'
+            return name + re.sub('^fatal', red('fatal'), errline) + '\n'
 
         if err and not updating:
-            err = red(err.split('\n')[0])
-            return name + err + '\n'
+            return name + red(errline) + '\n'
 
-        if err and updating and re.search('http', err.splitlines()[0]):
+        if err and updating and re.search('http', errline):
             err += '\n'
 
         if out:
-            ok = False
-
             if ACTION == 'fetch':
                 out = out.replace('Fetching ', '').split('\n')
                 out = 'Fetching ' + ', '.join(out[:-1]) + '\n'
@@ -177,11 +179,15 @@ class Package():
                 err = err.replace('error:', red('error:'))
                 err = err.replace('Aborting', red('Aborting'))
 
-        if out and updating and not ok:
-            LOGFILE[self.name] = {'out': cmd[0], 'err': cmd[1], 'time': time()}
-
         if out or err:
-            return name + out + err
+            if updating and not ok:
+                LOGFILE[self.name] = {'out': cmd[0], 'err': cmd[1], 'time': time()}
+            if out and err:
+                return name + out + err + '\n'
+            elif out:
+                return name + out
+            elif err:
+                return name + red(errline) + '\n'
         else:
             return ''
 
@@ -783,16 +789,23 @@ def write_logfiles():
     updated plugin, overwriting existing files.
     """
     os.makedirs(PACKS['logsdir'], exist_ok=True)
+    timestamp = strftime("%Y_%m_%d_%H_%M")
     # a logfile for each updated plugin
     for k in LOGFILE:
         with open(PACKS['logsdir'] + k, 'w') as file:
             json.dump(LOGFILE[k], file)
     # the unified logfile only contains stdout's, not stderr's
-    unified = {k: LOGFILE[k] for k in LOGFILE if 'out' in LOGFILE[k]}
+    unified = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]['out']}
     if unified:
-        fname = 'vpacks_update_' + strftime("%Y_%m_%d_%H_%M")
+        fname = 'vpacks_update_' + timestamp
         with open(PACKS['logsdir'] + fname, 'w') as file:
             json.dump(unified, file)
+    # the errors logfile only contains stderr's
+    errors = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]['err']}
+    if errors:
+        fname = 'vpacks_errors_' + timestamp
+        with open(PACKS['logsdir'] + fname, 'w') as file:
+            json.dump(errors, file)
 
 
 #------------------------------------------------------------------------------
@@ -907,9 +920,10 @@ def process_logs(args):
     Print logs if available, depending on the argument given.
 
     no args:  print just the contents of the logs directory
+    errors:   print the last errors log
     number:   0 is the log for the last update, 1 for the previous one, etc
     pack:     print the log for the package, if present
-    clear:    clear all vpacks_update_* logs
+    clear:    clear all vpacks_* logs
     clearall: clear all logs
     """
     if ( not args ):
@@ -918,8 +932,8 @@ def process_logs(args):
         subprocess.run(['ls', '-ls'], cwd=PACKS['logsdir'])
 
     elif args[0] == 'clear':
-        # clear all vpacks_update_* logs
-        for f in glob.iglob(PACKS['logsdir'] + 'vpacks_update_*'):
+        # clear all vpacks_* logs
+        for f in glob.iglob(PACKS['logsdir'] + 'vpacks_*'):
             subprocess.run(['rm', f])
 
     elif args[0] == 'clearall':
@@ -927,13 +941,29 @@ def process_logs(args):
         for f in glob.iglob(PACKS['logsdir'] + '*'):
             subprocess.run(['rm', f])
 
+    elif args[0] == 'errors':
+        errors = sorted(list(filter(lambda x: re.search('vpacks_errors_', x)
+                                    is not None,
+                                    os.listdir(PACKS['logsdir']))))
+        if errors:
+            term_header('Reading', errors[-1])
+            with open(PACKS['logsdir'] + errors[-1]) as file:
+                packs = json.load(file)
+                for name in packs:
+                    if name in PACKS['packs']:
+                        print("%s\n" % red(name))
+                        print(packs[name]['out'])
+                        print(packs[name]['err'])
+        else:
+            error('no errors')
+
     elif re.search('^\d$', args[0]):
         # example: 'vpacks logs 0' prints the last log
-        logs = sorted(list(filter(lambda x: re.search('vpacks_update_', x)
-                                  is not None,
-                                  os.listdir(PACKS['logsdir']))))
+        logs = sorted(list(filter(lambda x: re.search('vpacks_update_', x) is
+                                  not None, os.listdir(PACKS['logsdir']))),
+                      reverse=True)
         if logs:
-            ix = max(len(logs) - 1, int(args[0]))
+            ix = min(len(logs) - 1, int(args[0]))
             term_header('Reading', logs[ix])
             with open(PACKS['logsdir'] + logs[ix]) as file:
                 packs = json.load(file)
@@ -942,6 +972,15 @@ def process_logs(args):
                     print("%s\n" % green(name))
                     print(packs[name]['out'])
                     print(packs[name]['err'])
+            errors = PACKS['logsdir'] + logs[ix].replace('update', 'errors')
+            if os.path.isfile(errors):
+                with open(errors) as file:
+                    packs = json.load(file)
+                    for name in packs:
+                        if name in PACKS['packs']:
+                            print("%s\n" % red(name))
+                            print(packs[name]['out'])
+                            print(packs[name]['err'])
         else:
             error('no logs')
     else:
