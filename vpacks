@@ -6,8 +6,9 @@ import re
 import subprocess
 import sys
 import shutil
-from time import sleep,time
+from time import sleep,time,strftime
 import webbrowser
+import json
 
 #------------------------------------------------------------------------------
 # Global variables
@@ -16,7 +17,7 @@ import webbrowser
 
 ACTIONS = [ 'list', 'update', 'status', 'verbose', 'web', 'git', 'exe', 'log',
             'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
-            'helptags', 'backup', 'restore', 'terminal']
+            'helptags', 'backup', 'restore', 'terminal', 'logs']
 
 ACTION          = ''
 ASYNC           = True
@@ -37,6 +38,7 @@ SHALLOW         = True
 SHOW_SIZE       = False
 TIMEOUT         = 0
 WARNINGS        = []
+LOGFILE         = {}
 
 COLORS = {
     'darkred':     '\33[31m',
@@ -95,7 +97,7 @@ class Package():
                 'git':      self.git,            'exe':     self.exe,
                 'web':      self.web,            'status':  self.status,
                 'backup':   self.backup,         'restore': self.restore,
-                'helptags': self.helptags,
+                'helptags': self.helptags,       'logs':    self.logs,
                 }[action]()
 
     def packdir(self):
@@ -141,7 +143,7 @@ class Package():
             return ''
 
         name = "%-30s" % (self.name + ': ')
-        out, err = cmd
+        out, err = cmd.copy()
 
         if ( err[:5] == 'fatal' ):
             rest = re.sub('\..*', '.', err.split('\n')[0][5:])
@@ -173,6 +175,9 @@ class Package():
                 out = out.replace('Aborting', red('Aborting'))
                 err = err.replace('error:', red('error:'))
                 err = err.replace('Aborting', red('Aborting'))
+
+        if out and updating and not ok:
+            LOGFILE[self.name] = {'out': cmd[0], 'err': cmd[1], 'time': time()}
 
         if out or err:
             return name + out + err
@@ -242,6 +247,18 @@ class Package():
         else:
             # add a small delay to avoid too many connections in a short time
             sleep(0.1)
+
+    def logs(self):
+        log = PACKS['logsdir'] + self.name
+        if os.path.exists(log):
+            with open(log) as lfile:
+                ljson = json.load(lfile)
+            print("%s\n" % green(self.name))
+            print(ljson['out'])
+            print(ljson['err'])
+        else:
+            print('%s: no logs' % red(self.name))
+
 
     def terminal(self):
         if os.name != 'nt':
@@ -427,6 +444,7 @@ class Packdir():
     def helptags(self): self.cmd('helptags')
     def backup(self):   self.cmd('backup')
     def restore(self):  self.cmd('restore')
+    def logs(self):     self.cmd('logs')
 
     def cmd(self, action):
         for p in self.walk(_opt_):
@@ -543,6 +561,7 @@ def print_help():
         ['helptags',    'update helptags for package(s)'],
         ['backup',      'move/list package(s) to the backup directory'],
         ['restore',     'restore/list package(s) from the backup directory'],
+        ['logs',        'show available logs [for package/dir]'],
         ['log [-n]',    'log the last (-n) commit(s) for repo(s)'],
         ['graph [-n]',  'log the graph of the commit history for repo(s)'],
         ['git',         'run a single, quoted git command'],
@@ -673,6 +692,7 @@ def find_packs():
             PACKS['basedir'] = path + SEP
             PACKS['packdir'] = PACKS['basedir'] + 'pack' + SEP
             PACKS['bkupdir'] = PACKS['packdir'] + 'backup' + SEP
+            PACKS['logsdir'] = PACKS['packdir'] + 'logs' + SEP
             break
 
     if not PACKS['packdir']:
@@ -683,6 +703,9 @@ def find_packs():
 
     if 'backup' in PACKS['dirs']:
         del PACKS['dirs']['backup']
+
+    if 'logs' in PACKS['dirs']:
+        del PACKS['dirs']['logs']
 
     # ignore the packages that have been moved in the backups directory
     bdir      = re.compile(PACKS['bkupdir'])
@@ -752,6 +775,24 @@ def term_header(string, path):
         log("\n" + "-" * 67)
         log(string + " " + path)
         log("-" * 67 + "\n")
+
+
+def write_logfiles():
+    """
+    Write JSON logfiles: a cumulative one with a timestamp, and one for each
+    updated plugin, overwriting existing files.
+    """
+    os.makedirs(PACKS['logsdir'], exist_ok=True)
+    # a logfile for each updated plugin
+    for k in LOGFILE:
+        with open(PACKS['logsdir'] + k, 'w') as file:
+            json.dump(LOGFILE[k], file)
+    # the unified logfile only contains stdout's, not stderr's
+    unified = {k: LOGFILE[k] for k in LOGFILE if 'out' in LOGFILE[k]}
+    if unified:
+        fname = 'vpacks_update_' + strftime("%Y_%m_%d_%H_%M")
+        with open(PACKS['logsdir'] + fname, 'w') as file:
+            json.dump(unified, file)
 
 
 #------------------------------------------------------------------------------
@@ -832,6 +873,11 @@ def parse_args():
         parse_restore(args)
         return
 
+    elif ( ACTION == 'logs' ):
+        os.makedirs(PACKS['logsdir'], exist_ok=True)
+        if process_logs(args):
+            return
+
     elif ( ACTION == 'log' ):
         n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else '-1'
         EXE = 'log %s --' % n
@@ -856,6 +902,56 @@ def parse_args():
     else:
         for arg in args:
             walk_arg(arg)
+
+
+def process_logs(args):
+    """
+    Print logs if available, depending on the argument given.
+
+    no args:  print just the contents of the logs directory
+    number:   0 is the log for the last update, 1 for the previous one, etc
+    pack:     print the log for the package, if present
+    clear:    clear all vpacks_update_* logs
+    clearall: clear all logs
+    """
+    if ( not args ):
+        # print just the contents of the logs directory
+        term_header('Logs in directory', PACKS['logsdir'])
+        subprocess.run(['ls', '-ls'], cwd=PACKS['logsdir'])
+
+    elif args[0] == 'clear':
+        # clear all vpacks_update_* logs
+        for f in glob.iglob(PACKS['logsdir'] + 'vpacks_update_*'):
+            subprocess.run(['rm', f])
+
+    elif args[0] == 'clearall':
+        # clear all logs
+        for f in glob.iglob(PACKS['logsdir'] + '*'):
+            subprocess.run(['rm', f])
+
+    elif re.search('^\d$', args[0]):
+        # example: 'vpacks logs 0' prints the last log
+        logs = sorted(list(filter(lambda x: re.search('vpacks_update_', x)
+                                  is not None,
+                                  os.listdir(PACKS['logsdir']))))
+        if logs:
+            ix = max(len(logs) - 1, int(args[0]))
+            term_header('Reading', logs[ix])
+            with open(PACKS['logsdir'] + logs[ix]) as file:
+                packs = json.load(file)
+            for name in packs:
+                if name in PACKS['packs']:
+                    print("%s\n" % green(name))
+                    print(packs[name]['out'])
+                    print(packs[name]['err'])
+        else:
+            error('no logs')
+    else:
+        # each arg will be processed, printing logs for each
+        # this will be done in the parse_args() function, not here
+        return False
+    # default return value for previous cases
+    return True
 
 
 def parse_install(args):
@@ -1021,12 +1117,16 @@ def process_action():
             'log':      q.git,           'graph':      q.git,
             'web':      q.web,           'helptags':   q.helptags,
             'backup':   q.backup,        'restore':    q.restore,
-            'terminal': q.terminal,
+            'terminal': q.terminal,      'logs':       q.logs,
         }
         log ( actions[ACTION]() )
 
     # packages may have been queued for async processing
     process_asynch()
+
+    # if updating packages, write a log file
+    if ( LOGFILE ):
+        write_logfiles()
 
 
 #------------------------------------------------------------------------------

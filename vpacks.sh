@@ -10,7 +10,7 @@ __vpacks_completions()
 		return
 	fi
 	if [ "${#COMP_WORDS[@]}" == "2" ]; then
-		COMPREPLY=($(compgen -W "list update status verbose web git exe log move2opt move2start remotes fetch graph helptags restore backup terminal install" "${COMP_WORDS[1]}"))
+		COMPREPLY=($(compgen -W "list update status verbose web git exe log logs move2opt move2start remotes fetch graph helptags restore backup terminal install" "${COMP_WORDS[1]}"))
 	elif [ "${#COMP_WORDS[@]}" == "3" ]; then
 		if [ "${COMP_WORDS[1]}" == "restore" ]; then
 			local backups=$(echo $vimdir/pack/backup/* | sed "s@$vimdir/pack/backup/@@g")
