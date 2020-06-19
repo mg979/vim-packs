@@ -252,8 +252,7 @@ class Package():
         PROCESSING.append(self)
         if not ASYNC:
             wait(self)
-        else:
-            # add a small delay to avoid too many connections in a short time
+        else: # add a small delay to avoid too many connections in a short time
             sleep(0.1)
 
     def logs(self):
@@ -336,6 +335,8 @@ class Package():
         PROCESSING.append(self)
         if not ASYNC:
             wait(self)
+        else: # add a small delay to avoid too many connections in a short time
+            sleep(0.1)
 
     def move2opt(self, silent=False):
         name = green(self.name)
@@ -456,6 +457,8 @@ class Packdir():
             PROCESSING.append(repo)
             if not ASYNC:
                 wait(repo)
+            else: # add a small delay to avoid too many connections in a short time
+                sleep(0.1)
 
     #--------------------------------------------------------------------------
     # class commands: methods names have their correspective in Package class
