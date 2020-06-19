@@ -18,6 +18,7 @@ fun! vpacks#check_packages() abort
   setlocal bt=nofile bh=wipe noswf nobl nowrap
   setfiletype vpackslist
 
+  let &l:statusline = "%#PmenuSel# I: %#Pmenu# install   %#PmenuSel# U: %#Pmenu# update   %#PmenuSel# D: %#Pmenu# diff"
   call setline(1, printf("%-30s\tStatus\t\t%-38s\tOptions", 'Packages', 'Repo'))
   put =''
   for pack in sort(keys(packs))
@@ -31,6 +32,8 @@ fun! vpacks#check_packages() abort
   call append(line('$'), '')
 
   nnoremap <buffer> I :call <sid>install_pack()<cr>
+  nnoremap <buffer> D :exe 'Vpacks lastdiff' split(getline('.'))[0]<cr>
+  nnoremap <buffer> U :exe 'Vpacks update' split(getline('.'))[0]<cr>
 
   if empty(errors)
     call append(line('$'), 'No errors')
@@ -74,6 +77,7 @@ endfun
 
 fun! vpacks#run(bang, cmd, ...) abort
   echo "\r"
+  let s:cmd = a:cmd
   if a:bang || get(g:, 'vpacks_force_true_terminal', 0)
     exe '!' . s:vpacks . ' ' . a:cmd
   elseif has('nvim')
@@ -89,7 +93,6 @@ fun! vpacks#run(bang, cmd, ...) abort
     call term_start(s:vpacks . ' ' . a:cmd, opts)
     let wait = '%#Search# Please wait... %#StatusLine# '
     let &l:statusline = a:0 ? a:1 : (wait . 'vpacks ' . a:cmd)
-    let s:cmd = a:cmd
     call s:setftype()
   else
     exe '!' . s:vpacks . ' ' . a:cmd
@@ -97,8 +100,12 @@ fun! vpacks#run(bang, cmd, ...) abort
 endfun
 
 fun! s:setftype() abort
-  120wincmd |
-  setfiletype vpacks
+    120wincmd |
+    if s:cmd =~ 'lastdiff'
+      setfiletype diff
+    else
+      setfiletype vpacks
+    endif
 endfun
 
 fun! vpacks#statusline(...)

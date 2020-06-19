@@ -18,7 +18,7 @@ import json
 
 ACTIONS = [ 'list', 'update', 'dirty', 'verbose', 'web', 'git', 'exe', 'log',
             'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
-            'helptags', 'backup', 'restore', 'terminal', 'logs']
+            'helptags', 'backup', 'restore', 'terminal', 'logs', 'lastdiff']
 
 ACTION          = ''
 ASYNC           = True
@@ -99,6 +99,7 @@ class Package():
                 'web':      self.web,            'dirty':   self.dirty,
                 'backup':   self.backup,         'restore': self.restore,
                 'helptags': self.helptags,       'logs':    self.logs,
+                'lastdiff': self.lastdiff,
                 }[action]()
 
     def packdir(self):
@@ -266,6 +267,26 @@ class Package():
         else:
             print('%s: no logs' % red(self.name))
 
+    def lastdiff(self):
+        log = PACKS['logsdir'] + self.name
+        if os.path.exists(log):
+            with open(log) as lfile:
+                ljson = json.load(lfile)
+            if not ljson['out']:
+                print('%s: no diffs' % red(self.name))
+                return
+            shas = re.findall('([a-f0-9]{7,8})(?:\.\.|$)', ljson['out'].split('\n')[0])
+            if len(shas) != 2:
+                print('%s: no diffs' % red(self.name))
+                return
+            print("%s\n" % green(self.name))
+            color = "-c color.ui=always" if COLOR else ""
+            diff = "diff %s %s" % (shas[0], shas[1])
+            out, err = self.shell("git --no-pager %s %s" % (color, diff))
+            print(err)
+            print(out)
+        else:
+            print('%s: no logs' % red(self.name))
 
     def terminal(self):
         if os.name != 'nt':
@@ -452,6 +473,7 @@ class Packdir():
     def backup(self):   self.cmd('backup')
     def restore(self):  self.cmd('restore')
     def logs(self):     self.cmd('logs')
+    def lastdiff(self): self.cmd('lastdiff')
 
     def cmd(self, action):
         for p in self.walk(_opt_):
@@ -561,6 +583,8 @@ def print_help():
         ['update',      'update packages'],
         ['install',     'install packages from remote repos'],
         ['verbose',     'verbose status (with diff)'],
+        ['logs',        'show available logs [for package/dir]'],
+        ['lastdiff',    'show last diff for package/dir (if log is available)'],
         ['dirty',       'list only packages with a dirty working tree'],
         ['remotes',     'list remotes for packages'],
         ['fetch',       'fetch all remotes'],
@@ -568,7 +592,6 @@ def print_help():
         ['helptags',    'update helptags for package(s)'],
         ['backup',      'move/list package(s) to the backup directory'],
         ['restore',     'restore/list package(s) from the backup directory'],
-        ['logs',        'show available logs [for package/dir]'],
         ['log [-n]',    'log the last (-n) commit(s) for repo(s)'],
         ['graph [-n]',  'log the graph of the commit history for repo(s)'],
         ['git',         'run a single, quoted git command'],
@@ -602,6 +625,13 @@ def print_help():
         ['dir=DIR',     'set base installation directory for packages (.vim/pack/DIR)'],
     ]
 
+    logopts = [
+        ['N',           'show last (+N) unified log'],
+        ['rm [N]',      'remove last (+N) unified log'],
+        ['clear',       'remove all unified update/error logs'],
+        ['clearall',    'remove also logs for all single packages'],
+    ]
+
     examples = [
         ['List all packages in the pack/my_packs/*/* directories',
          'vpacks list my_packs'],
@@ -613,33 +643,31 @@ def print_help():
          'vpacks install dir=my_packs start mg979/vim-visual-multi'],
         ['Read last update log',
          'vpacks logs 0'],
+        ['Read last update errors',
+         'vpacks logs errors'],
         ['Run git command',
          'vpacks git "branch --list" my_packs'],
-        ['Read last update errors',
-         'vpacks logs errors']
     ]
 
     if not HELP:
         examples = examples[:5]
 
-    print()
-    print("Usage:\tvpacks [options] COMMAND [pack | directory]")
-    print("\tvpacks [options] install [instopts] REPOS")
-    print()
-    print("Commands:")
+    print("\nUsage:\tvpacks [options] COMMAND [pack | directory]\n"
+          "\tvpacks [options] install [instopts] REPOS")
+    print("\nCommands:")
     for c in commands:
         print("\t" + "%-20s" % green(c[0]) + c[1])
-    print()
-    print("Options:")
+    print("\nOptions:")
     for o in options:
         print("\t" + "%-20s" % green(o[0]) + o[1])
-    print()
-    print("Installation options:")
+    print("\nInstallation options:")
     for o in instopts:
         print("\t" + "%-20s" % green(o[0]) + o[1])
-    print()
-    print("Examples:")
-    print()
+    if HELP:
+        print("\nLogging options:")
+        for o in logopts:
+            print("\t" + "%-20s" % green(o[0]) + o[1])
+    print("\nExamples:\n")
     for e in examples:
         print('\t' + e[0] + '\n\t' + color('darkgreen', e[1]) + '\n')
     sys.exit()
@@ -928,8 +956,9 @@ def process_logs(args):
 
     no args:  print just the contents of the logs directory
     errors:   print the last errors log
-    number:   0 is the log for the last update, 1 for the previous one, etc
     pack:     print the log for the package, if present
+    N:        0 is the log for the last update, 1 for the previous one, etc
+    rm N:     remove last (+N) log
     clear:    clear all vpacks_* logs
     clearall: clear all logs
     """
@@ -950,8 +979,7 @@ def process_logs(args):
 
     elif args[0] == 'errors':
         errors = sorted(list(filter(lambda x: re.search('vpacks_errors_', x)
-                                    is not None,
-                                    os.listdir(PACKS['logsdir']))))
+                                    is not None, os.listdir(PACKS['logsdir']))))
         if errors:
             term_header('Reading', errors[-1])
             with open(PACKS['logsdir'] + errors[-1]) as file:
@@ -963,6 +991,20 @@ def process_logs(args):
                         print(packs[name]['err'])
         else:
             error('no errors')
+
+    elif args[0] == 'rm' and re.search('^\d$', args[1]):
+        # example: 'vpacks logs rm 0' removes the last log
+        logs = sorted(list(filter(lambda x: re.search('vpacks_update_', x) is
+                                  not None, os.listdir(PACKS['logsdir']))),
+                      reverse=True)
+        if logs:
+            ix = min(len(logs) - 1, int(args[1]))
+            subprocess.run(['rm', PACKS['logsdir'] + logs[ix]])
+            errors = PACKS['logsdir'] + logs[ix].replace('update', 'errors')
+            if errors:
+                subprocess.run(['rm', errors])
+        else:
+            error('no logs')
 
     elif re.search('^\d$', args[0]):
         # example: 'vpacks logs 0' prints the last log
@@ -1162,6 +1204,7 @@ def process_action():
             'web':      q.web,           'helptags':   q.helptags,
             'backup':   q.backup,        'restore':    q.restore,
             'terminal': q.terminal,      'logs':       q.logs,
+            'lastdiff': q.lastdiff,
         }
         log ( actions[ACTION]() )
 
