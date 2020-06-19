@@ -273,12 +273,10 @@ class Package():
             with open(log) as lfile:
                 ljson = json.load(lfile)
             if not ljson['out']:
-                print('%s: no diffs' % red(self.name))
-                return
+                return self.logs()
             shas = re.findall('([a-f0-9]{7,8})(?:\.\.|$)', ljson['out'].split('\n')[0])
-            if len(shas) != 2:
-                print('%s: no diffs' % red(self.name))
-                return
+            if not shas or len(shas) != 2:
+                return self.logs()
             print("%s\n" % green(self.name))
             color = "-c color.ui=always" if COLOR else ""
             diff = "diff %s %s" % (shas[0], shas[1])
