@@ -7,273 +7,306 @@ import re
 import subprocess
 import sys
 import shutil
-from time import sleep,time,strftime
+from time import sleep, time, strftime
 import webbrowser
 import json
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Global variables
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
-ACTIONS = [ 'list', 'update', 'dirty', 'verbose', 'web', 'git', 'exe', 'log',
-            'move2opt', 'move2start', 'install', 'remotes', 'fetch', 'graph',
-            'helptags', 'backup', 'restore', 'terminal', 'logs', 'lastdiff']
+ACTIONS = [
+    "list",
+    "update",
+    "dirty",
+    "verbose",
+    "web",
+    "git",
+    "exe",
+    "log",
+    "move2opt",
+    "move2start",
+    "install",
+    "remotes",
+    "fetch",
+    "graph",
+    "helptags",
+    "backup",
+    "restore",
+    "terminal",
+    "logs",
+    "lastdiff",
+]
 
-ACTION          = ''
-ASYNC           = True
-COLOR           = os.name != 'nt'
-DECO            = True
-HAS_OUTPUT      = False
-HELP            = False
-INSTALL         = False
-INSTDIR         = 'vpacks'
-INSTOPT         = True
-NO_OUTPUT       = False
-ONLY_OPT        = False
-ONLY_START      = False
-PACKS           = {}
-PROCESSING      = []
-QUEUE           = []
-SHALLOW         = True
-SHOW_SIZE       = False
-TIMEOUT         = 0
-WARNINGS        = []
-LOGFILE         = {}
+ACTION = ""
+ASYNC = True
+COLOR = os.name != "nt"
+DECO = True
+HAS_OUTPUT = False
+HELP = False
+INSTALL = False
+INSTDIR = "vpacks"
+INSTOPT = True
+NO_OUTPUT = False
+ONLY_OPT = False
+ONLY_START = False
+PACKS = {}
+PROCESSING = []
+QUEUE = []
+SHALLOW = True
+SHOW_SIZE = False
+TIMEOUT = 0
+WARNINGS = []
+LOGFILE = {}
 
 COLORS = {
-    'darkred':     '\33[31m',
-    'darkgreen':   '\33[32m',
-    'darkyellow':  '\33[33m',
-    'darkblue':    '\33[34m',
-    'darkviolet':  '\33[35m',
-    'darkcyan':    '\33[36m',
-    'red':         '\33[91m',
-    'green':       '\33[92m',
-    'yellow':      '\33[93m',
-    'blue':        '\33[94m',
-    'violet':      '\33[95m',
-    'cyan':        '\33[96m',
+    "darkred": "\33[31m",
+    "darkgreen": "\33[32m",
+    "darkyellow": "\33[33m",
+    "darkblue": "\33[34m",
+    "darkviolet": "\33[35m",
+    "darkcyan": "\33[36m",
+    "red": "\33[91m",
+    "green": "\33[92m",
+    "yellow": "\33[93m",
+    "blue": "\33[94m",
+    "violet": "\33[95m",
+    "cyan": "\33[96m",
 }
 
-UP_TO_DATE = re.compile('Already up.to.date.')
+UP_TO_DATE = re.compile("Already up.to.date.")
 
-SEP = os.sep.replace('\\', '\\\\')
-_start_ = SEP + 'start' + SEP
-_opt_ = SEP + 'opt' + SEP
+SEP = os.sep.replace("\\", "\\\\")
+_start_ = SEP + "start" + SEP
+_opt_ = SEP + "opt" + SEP
 
-if shutil.which('vim') is not None:
-    VIM = 'vim '
-elif shutil.which('nvim') is not None:
-    VIM = 'nvim '
+if shutil.which("vim") is not None:
+    VIM = "vim "
+elif shutil.which("nvim") is not None:
+    VIM = "nvim "
 else:
-    VIM = ''
+    VIM = ""
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Package class
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
-class Package():
+class Package:
     """Class for vim packages."""
+
     def __init__(self, name, pdir=None, restore_from_backup=False):
         self.name = name
         if restore_from_backup:
-            self.path = PACKS['bkupdir'] + SEP + name
+            self.path = PACKS["bkupdir"] + SEP + name
         elif pdir:
-            self.path = PACKS['dirs'][pdir] + name
+            self.path = PACKS["dirs"][pdir] + name
         else:
-            self.path = PACKS['packs'][name]
+            self.path = PACKS["packs"][name]
         self.is_package, self.process = True, None
         self.timeout = TIMEOUT
 
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # class helpers: specific to this class
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
     def cmd(self, action):
         return {
-                'verbose':  self.verbose,        'remotes': self.remotes,
-                'git':      self.git,            'exe':     self.exe,
-                'web':      self.web,            'dirty':   self.dirty,
-                'backup':   self.backup,         'restore': self.restore,
-                'helptags': self.helptags,       'logs':    self.logs,
-                'lastdiff': self.lastdiff,
-                }[action]()
+            "verbose": self.verbose,
+            "remotes": self.remotes,
+            "git": self.git,
+            "exe": self.exe,
+            "web": self.web,
+            "dirty": self.dirty,
+            "backup": self.backup,
+            "restore": self.restore,
+            "helptags": self.helptags,
+            "logs": self.logs,
+            "lastdiff": self.lastdiff,
+        }[action]()
 
     def packdir(self):
-        return re.sub('('+_opt_+'|'+_start_+')' + self.name + '$', '', self.path)
+        return re.sub(
+            "(" + _opt_ + "|" + _start_ + ")" + self.name + "$", "", self.path
+        )
 
     def is_opt(self):
-        return re.search(_opt_ + self.name + '$', self.path)
+        return re.search(_opt_ + self.name + "$", self.path)
 
     def is_start(self):
-        return re.search(_start_ + self.name + '$', self.path)
+        return re.search(_start_ + self.name + "$", self.path)
 
     def shell(self, cmd):
         """Run a shell command, return stdout and stderr."""
-        res = subprocess.run(cmd.split(' '), cwd=self.path,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        return [res.stdout.decode('utf-8'), res.stderr.decode('utf-8')]
+        res = subprocess.run(
+            cmd.split(" "),
+            cwd=self.path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return [res.stdout.decode("utf-8"), res.stderr.decode("utf-8")]
 
     def async_shell(self, cmd):
         """Run a shell command asynchronously."""
-        return subprocess.Popen(cmd.split(' '), cwd=self.path,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+        return subprocess.Popen(
+            cmd.split(" "),
+            cwd=self.path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
     def size(self):
-        s = subprocess.run(['du', '-chs'], cwd=self.path,
-                           stdout=subprocess.PIPE)
-        return s.stdout.decode('utf-8').split('\n')[0].replace('\t.', '')
+        s = subprocess.run(["du", "-chs"], cwd=self.path, stdout=subprocess.PIPE)
+        return s.stdout.decode("utf-8").split("\n")[0].replace("\t.", "")
 
     def verbose_output(self, cmd, nl=False):
-        n = '\n' if nl else ''
-        name = '\n' + green(self.name) + ': ' + n
+        n = "\n" if nl else ""
+        name = "\n" + green(self.name) + ": " + n
         if cmd[1]:
-            return name + red(cmd[1]) + '\n'
+            return name + red(cmd[1]) + "\n"
         elif cmd[0]:
-            c = cmd[0].replace('nothing to commit, working tree clean\n', '')
+            c = cmd[0].replace("nothing to commit, working tree clean\n", "")
             return name + c
 
     def output(self, cmd, updating=False):
         """Merge stdout and stderr if updating packages, otherwise prioritize
         stderr. Return an empty string if no output at all."""
         if NO_OUTPUT:
-            return ''
+            return ""
 
-        name = "%-30s" % (self.name + ': ')
+        name = "%-30s" % (self.name + ": ")
         out, err = cmd.copy()
         ok = False
 
         if err:
             # limit most error messages to the first line of the error
             # the full messages can be read with 'vpacks logs errors'
-            errline = err.split('\n')[0]
+            errline = err.split("\n")[0]
 
-        if ( err[:5] == 'fatal' ):
-            return name + re.sub('^fatal', red('fatal'), errline) + '\n'
+        if err[:5] == "fatal":
+            return name + re.sub("^fatal", red("fatal"), errline) + "\n"
 
         if err and not updating:
-            return name + red(errline) + '\n'
+            return name + red(errline) + "\n"
 
-        if err and updating and re.search('http', errline):
-            err += '\n'
+        if err and updating and re.search("http", errline):
+            err += "\n"
 
         if out:
-            if ACTION == 'fetch':
-                out = out.replace('Fetching ', '').split('\n')
-                out = 'Fetching ' + ', '.join(out[:-1]) + '\n'
-            elif ACTION == 'remotes':
-                out = ', '.join(reversed(out.splitlines())) + '\n'
+            if ACTION == "fetch":
+                out = out.replace("Fetching ", "").split("\n")
+                out = "Fetching " + ", ".join(out[:-1]) + "\n"
+            elif ACTION == "remotes":
+                out = ", ".join(reversed(out.splitlines())) + "\n"
             else:
                 if re.search(UP_TO_DATE, out):
-                    out = green('ok') + '\n'
+                    out = green("ok") + "\n"
                     ok = True
             if updating:
                 if not ok:
-                    name = '\n' + color('cyan', name, bold=True)
-                out = out.replace('error:', red('error:'))
-                out = out.replace('Aborting', red('Aborting'))
-                err = err.replace('error:', red('error:'))
-                err = err.replace('Aborting', red('Aborting'))
+                    name = "\n" + color("cyan", name, bold=True)
+                out = out.replace("error:", red("error:"))
+                out = out.replace("Aborting", red("Aborting"))
+                err = err.replace("error:", red("error:"))
+                err = err.replace("Aborting", red("Aborting"))
 
         if out or err:
             if updating and not ok:
-                LOGFILE[self.name] = {'out': cmd[0], 'err': cmd[1], 'time': time()}
+                LOGFILE[self.name] = {"out": cmd[0], "err": cmd[1], "time": time()}
             if out and err:
-                return name + out + err + '\n'
+                return name + out + err + "\n"
             elif out:
                 return name + out
             elif err:
-                return name + red(errline) + '\n'
+                return name + red(errline) + "\n"
         else:
-            return ''
+            return ""
 
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # class commands: methods names have their correspective in Packdir class
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
     def list(self, show_size=None):
-        cmd = self.shell('git status --porcelain')
+        cmd = self.shell("git status --porcelain")
         left = "%-40s " if COLOR else "%-31s"
         fmt = left + "%-5s %10s\n"
-        size = self.size() if (show_size is None and SHOW_SIZE) else ''
+        size = self.size() if (show_size is None and SHOW_SIZE) else ""
         if cmd[1]:
-            vals = (red(self.name), red('ER'), size)
+            vals = (red(self.name), red("ER"), size)
         elif cmd[0]:
             mod, unt = False, False
-            for line in cmd[0].split('\n'):
+            for line in cmd[0].split("\n"):
                 if not line:
                     continue
                 if not mod:
-                    mod = 'M' in line[:2]
+                    mod = "M" in line[:2]
                 if not unt:
-                    unt = '?' in line[:2]
-            sig = 'M?' if (mod and unt) else ' M' if mod else ' ?'
-            vals = (color('cyan', self.name), red(sig), size)
+                    unt = "?" in line[:2]
+            sig = "M?" if (mod and unt) else " M" if mod else " ?"
+            vals = (color("cyan", self.name), red(sig), size)
         else:
             fmt = "%-31s %-5s %10s\n"
-            vals = (self.name, green('ok'), size)
+            vals = (self.name, green("ok"), size)
         return fmt % vals
 
     def restore(self):
         """Move package from backup directory, into packages directory."""
-        src = PACKS['bkupdir'] + SEP + self.name
+        src = PACKS["bkupdir"] + SEP + self.name
         if not os.path.exists(src):
-            return red(self.name) + ' not in the backup directory'
-        dst = PACKS['packdir'] + INSTDIR + _start_or_opt_()
+            return red(self.name) + " not in the backup directory"
+        dst = PACKS["packdir"] + INSTDIR + _start_or_opt_()
         shutil.move(src, dst)
-        return green(self.name) + ' moved into directory ' + dst + '\n'
+        return green(self.name) + " moved into directory " + dst + "\n"
 
     def backup(self):
         """Move package into the backup directory."""
-        shutil.move(self.path, PACKS['bkupdir'])
-        return green(self.name) + ' moved into the backup directory\n'
+        shutil.move(self.path, PACKS["bkupdir"])
+        return green(self.name) + " moved into the backup directory\n"
 
     def helptags(self):
         """Update helptags for package."""
         if not VIM:
             return
-        docdir = (self.path + SEP + 'doc')
+        docdir = self.path + SEP + "doc"
         if os.path.isdir(docdir):
             subprocess.run(
-                VIM + ' -nEs -c "silent! helptags %s | q"'
-                % vimescape(docdir), shell=True)
+                VIM + ' -nEs -c "silent! helptags %s | q"' % vimescape(docdir),
+                shell=True,
+            )
 
     def update(self):
-        has_submodules = os.path.isfile(self.path + SEP + '.gitmodules')
+        has_submodules = os.path.isfile(self.path + SEP + ".gitmodules")
         if has_submodules:
-            self.shell('git submodule sync --recursive')
-            self.shell('git submodule update --init --recursive')
-        self.process = self.async_shell('git pull --ff-only')
+            self.shell("git submodule sync --recursive")
+            self.shell("git submodule update --init --recursive")
+        self.process = self.async_shell("git pull --ff-only")
         PROCESSING.append(self)
         if not ASYNC:
             wait(self)
-        else: # add a small delay to avoid too many connections in a short time
+        else:  # add a small delay to avoid too many connections in a short time
             sleep(0.1)
 
     def logs(self):
-        log = PACKS['logsdir'] + self.name
+        log = PACKS["logsdir"] + self.name
         if os.path.exists(log):
             with open(log) as lfile:
                 ljson = json.load(lfile)
             print("%s\n" % green(self.name))
-            print(ljson['out'])
-            print(ljson['err'])
+            print(ljson["out"])
+            print(ljson["err"])
         else:
-            print('%s: no logs' % red(self.name))
+            print("%s: no logs" % red(self.name))
 
     def lastdiff(self):
-        log = PACKS['logsdir'] + self.name
+        log = PACKS["logsdir"] + self.name
         if os.path.exists(log):
             with open(log) as lfile:
                 ljson = json.load(lfile)
-            if not ljson['out']:
+            if not ljson["out"]:
                 return self.logs()
-            shas = re.findall('([a-f0-9]{7,8})(?:\.\.|$)', ljson['out'].split('\n')[0])
+            shas = re.findall("([a-f0-9]{7,8})(?:\.\.|$)", ljson["out"].split("\n")[0])
             if not shas or len(shas) != 2:
                 return self.logs()
             print("%s\n" % green(self.name))
@@ -283,110 +316,119 @@ class Package():
             print(err)
             print(out)
         else:
-            print('%s: no logs' % red(self.name))
+            print("%s: no logs" % red(self.name))
 
     def terminal(self):
-        if os.name != 'nt':
+        if os.name != "nt":
             subprocess.run(
-                ['exo-open', '--launch', 'TerminalEmulator',
-                 '--working-directory', '%s' % self.path.replace(' ', '\ ')],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                [
+                    "exo-open",
+                    "--launch",
+                    "TerminalEmulator",
+                    "--working-directory",
+                    "%s" % self.path.replace(" ", "\ "),
+                ],
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
         else:
-            error('not in Windows')
+            error("not in Windows")
 
     def dirty(self):
-        cmd = self.shell('git status --porcelain')
+        cmd = self.shell("git status --porcelain")
         name = green(self.name)
         if cmd[1]:
-            return name + ': ' + red(cmd[1])
+            return name + ": " + red(cmd[1])
         elif cmd[0]:
-            lines = [(red(line[:2]) + line[2:])
-                     for line in cmd[0].splitlines()]
-            return '\n' + name + ':\n' + '\n'.join(lines) + '\n'
-        return ''
+            lines = [(red(line[:2]) + line[2:]) for line in cmd[0].splitlines()]
+            return "\n" + name + ":\n" + "\n".join(lines) + "\n"
+        return ""
 
     def verbose(self):
-        color = ' -c color.ui=always ' if COLOR else ' '
-        return self.verbose_output(
-            self.shell('git' + color + 'status -vv'))
+        color = " -c color.ui=always " if COLOR else " "
+        return self.verbose_output(self.shell("git" + color + "status -vv"))
 
     def remotes(self):
-        return self.output(self.shell('git remote'))
+        return self.output(self.shell("git remote"))
 
     def git(self):
-        color = ' -c color.ui=always ' if COLOR else ' '
-        return self.verbose_output(
-            self.shell('git' + color + EXE), nl=True)
+        color = " -c color.ui=always " if COLOR else " "
+        return self.verbose_output(self.shell("git" + color + EXE), nl=True)
 
     def exe(self):
         return self.verbose_output(self.shell(EXE), nl=True)
 
     def web(self):
         try:
-            remote = self.shell('git remote')[0].splitlines()[0]
-            url = self.shell('git remote get-url ' + remote)[0].splitlines()[0]
+            remote = self.shell("git remote")[0].splitlines()[0]
+            url = self.shell("git remote get-url " + remote)[0].splitlines()[0]
         except IndexError:
-            return red('fatal') + ": no web page for " + self.name
-        subprocess.run("python -m webbrowser '%s'" % url, shell=True,
-                       stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            return red("fatal") + ": no web page for " + self.name
+        subprocess.run(
+            "python -m webbrowser '%s'" % url,
+            shell=True,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
 
     def fetch(self):
-        self.process = self.async_shell('git fetch --all')
+        self.process = self.async_shell("git fetch --all")
         PROCESSING.append(self)
         if not ASYNC:
             wait(self)
-        else: # add a small delay to avoid too many connections in a short time
+        else:  # add a small delay to avoid too many connections in a short time
             sleep(0.1)
 
     def move2opt(self, silent=False):
         name = green(self.name)
         pdir = self.packdir()
-        if name == 'vim-packs':
+        if name == "vim-packs":
             log(name + " will not be moved")
         if self.is_opt():
             log(name + " is already in /opt")
         else:
             log("Moving " + name + " to /opt")
-            subprocess.run(['mv', self.path, pdir + _opt_])
-            PACKS['packs'][self.name] = pdir + _opt_ + self.name
+            subprocess.run(["mv", self.path, pdir + _opt_])
+            PACKS["packs"][self.name] = pdir + _opt_ + self.name
         if not NO_OUTPUT and not silent:
             Packdir(basename(pdir)).list(show_size=False)
 
     def move2start(self, silent=False):
         name = green(self.name)
         pdir = self.packdir()
-        if name == 'vim-packs':
+        if name == "vim-packs":
             log(name + " will not be moved")
         if self.is_start():
             log(name + " is already in /start")
         else:
             log("Moving " + name + " to /start")
-            subprocess.run(['mv', self.path, pdir + _start_])
-            PACKS['packs'][self.name] = pdir + _start_ + self.name
+            subprocess.run(["mv", self.path, pdir + _start_])
+            PACKS["packs"][self.name] = pdir + _start_ + self.name
         if not NO_OUTPUT and not silent:
             Packdir(basename(pdir)).list(show_size=False)
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Package directory class
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
-class Packdir():
+class Packdir:
     """Class for base package directories."""
+
     def __init__(self, name):
         self.name = name
-        if name in PACKS['dirs']:
-            self.path = PACKS['dirs'][name]
+        if name in PACKS["dirs"]:
+            self.path = PACKS["dirs"][name]
         else:
-            self.path = PACKS['dirs'][name] = PACKS['packdir'] + name
+            self.path = PACKS["dirs"][name] = PACKS["packdir"] + name
         self.is_package = False
         self.has_output_opt = False
         self.has_output_start = False
 
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # class helpers: specific to this class
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
     def ensure_exists(self):
         if os.path.exists(self.path) and not os.path.isdir(self.path):
@@ -413,68 +455,88 @@ class Packdir():
                     return p
 
     def header(self, path):
-        if ( not DECO or not os.path.exists(path) or not os.listdir(path) ):
+        if not DECO or not os.path.exists(path) or not os.listdir(path):
             return
         term_header("Packs in directory", path)
 
     def walk(self, subdir):
-        if ( ONLY_OPT and subdir == _start_ ):
+        if ONLY_OPT and subdir == _start_:
             return []
-        if ( ONLY_START and subdir == _opt_ ):
+        if ONLY_START and subdir == _opt_:
             return []
-        if ( os.path.exists(self.path + subdir) ):
-            return [d for d in glob.iglob(self.path + subdir + '*')
-                    if os.path.isdir(d)]
+        if os.path.exists(self.path + subdir):
+            return [d for d in glob.iglob(self.path + subdir + "*") if os.path.isdir(d)]
         return []
 
     def output(self, output, subdir):
         """Print the header only if there's some package to display."""
-        if ( NO_OUTPUT or not output ):
+        if NO_OUTPUT or not output:
             return
-        if ( not self.has_output_opt and subdir==_opt_ and not ONLY_START ):
+        if not self.has_output_opt and subdir == _opt_ and not ONLY_START:
             self.has_output_opt = True
             self.header(self.path + _opt_)
-        if ( not self.has_output_start and subdir==_start_ and not ONLY_OPT ):
+        if not self.has_output_start and subdir == _start_ and not ONLY_OPT:
             self.has_output_start = True
             self.header(self.path + _start_)
-        log(output, end='')
+        log(output, end="")
 
     def install(self, repo):
         if not self.has(repo.name):
             packdir = self.path + _start_or_opt_()
-            cmd = ['git', 'clone', '--recursive']
+            cmd = ["git", "clone", "--recursive"]
             if SHALLOW:
-                cmd.append('--depth')
-                cmd.append('1')
-                cmd.append('--shallow-submodules')
+                cmd.append("--depth")
+                cmd.append("1")
+                cmd.append("--shallow-submodules")
             repo.process = subprocess.Popen(
                 cmd + [repo.address],
                 cwd=packdir,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT
+                stderr=subprocess.STDOUT,
             )
             repo.path = packdir + repo.name
             PROCESSING.append(repo)
             if not ASYNC:
                 wait(repo)
-            else: # add a small delay to avoid too many connections in a short time
+            else:  # add a small delay to avoid too many connections in a short time
                 sleep(0.1)
 
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # class commands: methods names have their correspective in Package class
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
-    def verbose(self):  self.cmd('verbose')
-    def remotes(self):  self.cmd('remotes')
-    def git(self):      self.cmd('git')
-    def exe(self):      self.cmd('exe')
-    def web(self):      self.cmd('web')
-    def dirty(self):    self.cmd('dirty')
-    def helptags(self): self.cmd('helptags')
-    def backup(self):   self.cmd('backup')
-    def restore(self):  self.cmd('restore')
-    def logs(self):     self.cmd('logs')
-    def lastdiff(self): self.cmd('lastdiff')
+    def verbose(self):
+        self.cmd("verbose")
+
+    def remotes(self):
+        self.cmd("remotes")
+
+    def git(self):
+        self.cmd("git")
+
+    def exe(self):
+        self.cmd("exe")
+
+    def web(self):
+        self.cmd("web")
+
+    def dirty(self):
+        self.cmd("dirty")
+
+    def helptags(self):
+        self.cmd("helptags")
+
+    def backup(self):
+        self.cmd("backup")
+
+    def restore(self):
+        self.cmd("restore")
+
+    def logs(self):
+        self.cmd("logs")
+
+    def lastdiff(self):
+        self.cmd("lastdiff")
 
     def cmd(self, action):
         for p in self.walk(_opt_):
@@ -483,7 +545,7 @@ class Packdir():
             self.output(Package(basename(p)).cmd(action), _start_)
 
     def terminal(self):
-        error('terminal: not allowed for pack directories')
+        error("terminal: not allowed for pack directories")
 
     def list(self, show_size=None):
         for p in self.walk(_opt_):
@@ -526,13 +588,14 @@ class Packdir():
             self.list(show_size=False)
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Repository class
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
-class Repo():
+class Repo:
     """Class for remote repositories."""
+
     def __init__(self, arg):
         self.arg = arg
         self.name = None
@@ -544,11 +607,11 @@ class Repo():
 
     def validate(self):
         """Fill repo information. If repo is valid, return success."""
-        gh = 'https://github.com/'
-        gl = 'https://gitlab.com/'
+        gh = "https://github.com/"
+        gl = "https://gitlab.com/"
 
         try:
-            pack = self.arg.split('/')
+            pack = self.arg.split("/")
 
             if len(pack) == 2:
                 self.user, self.name = pack
@@ -556,105 +619,112 @@ class Repo():
 
             elif len(pack) == 3:
                 site, self.user, self.name = pack
-                if site == 'gh':
-                    self.address = (gh + self.user + '/' + self.name)
-                elif site == 'gl':
-                    self.address = (gl + self.user + '/' + self.name)
+                if site == "gh":
+                    self.address = gh + self.user + "/" + self.name
+                elif site == "gl":
+                    self.address = gl + self.user + "/" + self.name
                 else:
                     return False
 
-            elif re.search('^https?://', self.arg):
-                self.address = re.sub('/?$', '', self.arg)
-                self.name = re.sub('.*/|(\.git)?/?$', '', self.address)
-                self.user = re.match('.*/([^/]+)/', self.address).group(1)
+            elif re.search("^https?://", self.arg):
+                self.address = re.sub("/?$", "", self.arg)
+                self.name = re.sub(".*/|(\.git)?/?$", "", self.address)
+                self.user = re.match(".*/([^/]+)/", self.address).group(1)
         except:
             return False
         return self.address
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # HELP
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def print_help():
     """Print the help and exit."""
     commands = [
-        ['list',        'list packages'],
-        ['update',      'update packages'],
-        ['install',     'install packages from remote repos'],
-        ['verbose',     'verbose status (with diff)'],
-        ['logs',        'show available logs [for package/dir]'],
-        ['lastdiff',    'show last diff for package/dir (if log is available)'],
-        ['dirty',       'list only packages with a dirty working tree'],
-        ['remotes',     'list remotes for packages'],
-        ['fetch',       'fetch all remotes'],
-        ['terminal',    'open a new terminal at package directory'],
-        ['helptags',    'update helptags for package(s)'],
-        ['backup',      'move/list package(s) to the backup directory'],
-        ['restore',     'restore/list package(s) from the backup directory'],
-        ['log [-n]',    'log the last (-n) commit(s) for repo(s)'],
-        ['graph [-n]',  'log the graph of the commit history for repo(s)'],
-        ['git',         'run a single, quoted git command'],
-        ['exe',         'run a single, quoted command of any type'],
-        ['web',         'open web page, if possible'],
-        ['move2opt',    'move package(s) into the /opt directory'],
-        ['move2start',  'move package(s) into the /start directory'],
+        ["list", "list packages"],
+        ["update", "update packages"],
+        ["install", "install packages from remote repos"],
+        ["verbose", "verbose status (with diff)"],
+        ["logs", "show available logs [for package/dir]"],
+        ["lastdiff", "show last diff for package/dir (if log is available)"],
+        ["dirty", "list only packages with a dirty working tree"],
+        ["remotes", "list remotes for packages"],
+        ["fetch", "fetch all remotes"],
+        ["terminal", "open a new terminal at package directory"],
+        ["helptags", "update helptags for package(s)"],
+        ["backup", "move/list package(s) to the backup directory"],
+        ["restore", "restore/list package(s) from the backup directory"],
+        ["log [-n]", "log the last (-n) commit(s) for repo(s)"],
+        ["graph [-n]", "log the graph of the commit history for repo(s)"],
+        ["git", "run a single, quoted git command"],
+        ["exe", "run a single, quoted command of any type"],
+        ["web", "open web page, if possible"],
+        ["move2opt", "move package(s) into the /opt directory"],
+        ["move2start", "move package(s) into the /start directory"],
     ]
 
     if not HELP:
         commands = commands[:5]
 
     options = [
-        ['-h',          'extended help'],
-        ['-nd',         'no decorations (color, headers)'],
-        ['-nc',         'no color'],
-        ['-no',         'no output (for use inside scripts)'],
-        ['-na',         'no async update/cloning'],
-        ['-ps',         'print size for "list" subcommand'],
-        ['-time',       'timeout in seconds for operations (default 0)'],
-        ['-full',       'do not make shallow clones'],
-        ['-opt',        'command only considers opt packages'],
-        ['-start',      'command only considers start packages'],
+        ["-h", "extended help"],
+        ["-nd", "no decorations (color, headers)"],
+        ["-nc", "no color"],
+        ["-no", "no output (for use inside scripts)"],
+        ["-na", "no async update/cloning"],
+        ["-ps", 'print size for "list" subcommand'],
+        ["-time", "timeout in seconds for operations (default 0)"],
+        ["-full", "do not make shallow clones"],
+        ["-opt", "command only considers opt packages"],
+        ["-start", "command only considers start packages"],
     ]
 
     options = options[:4] if not HELP else options[1:]
 
     instopts = [
-        ['opt',         'install in /opt directory rather than in /start (DEFAULT)'],
-        ['start',       'install in /start directory rather than in /opt'],
-        ['dir=DIR',     'set base installation directory for packages (.vim/pack/DIR)'],
+        ["opt", "install in /opt directory rather than in /start (DEFAULT)"],
+        ["start", "install in /start directory rather than in /opt"],
+        ["dir=DIR", "set base installation directory for packages (.vim/pack/DIR)"],
     ]
 
     logopts = [
-        ['N',           'show last (+N) unified log'],
-        ['rm [N]',      'remove last (+N) unified log'],
-        ['clear',       'remove all unified update/error logs'],
-        ['clearall',    'remove also logs for all single packages'],
+        ["N", "show last (+N) unified log"],
+        ["rm [N]", "remove last (+N) unified log"],
+        ["clear", "remove all unified update/error logs"],
+        ["clearall", "remove also logs for all single packages"],
     ]
 
     examples = [
-        ['List all packages in the pack/my_packs/*/* directories',
-         'vpacks list my_packs'],
-        ['Verbose status for selected packages',
-         'vpacks verbose plugin.vim vim-another-plugin'],
-        ['Install a package in the default ("vpacks") directory, as "opt" type',
-         'vpacks install mg979/vim-visual-multi'],
-        ['Install packages in specific directory, as "start" type',
-         'vpacks install dir=my_packs start mg979/vim-visual-multi'],
-        ['Read last update log',
-         'vpacks logs 0'],
-        ['Read last update errors',
-         'vpacks logs errors'],
-        ['Run git command',
-         'vpacks git "branch --list" my_packs'],
+        [
+            "List all packages in the pack/my_packs/*/* directories",
+            "vpacks list my_packs",
+        ],
+        [
+            "Verbose status for selected packages",
+            "vpacks verbose plugin.vim vim-another-plugin",
+        ],
+        [
+            'Install a package in the default ("vpacks") directory, as "opt" type',
+            "vpacks install mg979/vim-visual-multi",
+        ],
+        [
+            'Install packages in specific directory, as "start" type',
+            "vpacks install dir=my_packs start mg979/vim-visual-multi",
+        ],
+        ["Read last update log", "vpacks logs 0"],
+        ["Read last update errors", "vpacks logs errors"],
+        ["Run git command", 'vpacks git "branch --list" my_packs'],
     ]
 
     if not HELP:
         examples = examples[:5]
 
-    print("\nUsage:\tvpacks [options] COMMAND [pack | directory]\n"
-          "\tvpacks [options] install [instopts] REPOS")
+    print(
+        "\nUsage:\tvpacks [options] COMMAND [pack | directory]\n"
+        "\tvpacks [options] install [instopts] REPOS"
+    )
     print("\nCommands:")
     for c in commands:
         print("\t" + "%-20s" % green(c[0]) + c[1])
@@ -670,13 +740,13 @@ def print_help():
             print("\t" + "%-20s" % green(o[0]) + o[1])
     print("\nExamples:\n")
     for e in examples:
-        print('\t' + e[0] + '\n\t' + color('darkgreen', e[1]) + '\n')
+        print("\t" + e[0] + "\n\t" + color("darkgreen", e[1]) + "\n")
     sys.exit()
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # GENERIC HELPERS
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def error(string):
@@ -689,24 +759,24 @@ def color(color, string, bold=False, line=False):
     """Print a colored string."""
     if not COLOR:
         return string
-    b = '\033[1m' if bold else ''
-    l = '\033[4m' if line else ''
-    return COLORS[color] + b + l + string + '\033[0m'
+    b = "\033[1m" if bold else ""
+    l = "\033[4m" if line else ""
+    return COLORS[color] + b + l + string + "\033[0m"
 
 
 def green(string):
-    return color('green', string)
+    return color("green", string)
 
 
 def red(string):
-    return color('red', string)
+    return color("red", string)
 
 
-def log(string, end='\n'):
+def log(string, end="\n"):
     """Print output if allowed."""
     if not NO_OUTPUT and string:
-        if os.name == 'nt':
-            string = string.replace('\\\\', '\\')
+        if os.name == "nt":
+            string = string.replace("\\\\", "\\")
         print(string, end=end)
 
 
@@ -714,58 +784,63 @@ def confirm(string):
     """Always return True with -no option."""
     if NO_OUTPUT:
         return True
-    print(string + '    ? (y/n)')
-    return sys.stdin.read(1) == 'y'
+    print(string + "    ? (y/n)")
+    return sys.stdin.read(1) == "y"
 
 
 def warning(msg, pack):
     """Issue a warning related to some package."""
     if NO_OUTPUT:
         return True
-    log(red('Warning') + ': ' + msg + ' (' + pack + ')')
+    log(red("Warning") + ": " + msg + " (" + pack + ")")
 
 
 def find_packs():
     """Find vim and package directories and basenames."""
     global WARNINGS
-    for p in ['~\\vimfiles', '~/.vim', '~/.local/share/nvim',
-              '~/.local/share/nvim/site']:
-        path = os.path.expanduser(p).replace('\\', '\\\\')
-        if os.path.exists(path + SEP + 'pack'):
-            PACKS['basedir'] = path + SEP
-            PACKS['packdir'] = PACKS['basedir'] + 'pack' + SEP
-            PACKS['bkupdir'] = PACKS['packdir'] + 'backup' + SEP
-            PACKS['logsdir'] = PACKS['packdir'] + 'logs' + SEP
+    for p in [
+        "~\\vimfiles",
+        "~/.vim",
+        "~/.local/share/nvim",
+        "~/.local/share/nvim/site",
+    ]:
+        path = os.path.expanduser(p).replace("\\", "\\\\")
+        if os.path.exists(path + SEP + "pack"):
+            PACKS["basedir"] = path + SEP
+            PACKS["packdir"] = PACKS["basedir"] + "pack" + SEP
+            PACKS["bkupdir"] = PACKS["packdir"] + "backup" + SEP
+            PACKS["logsdir"] = PACKS["packdir"] + "logs" + SEP
             break
 
-    if not PACKS['packdir']:
-        error('vpacks: packages directory not found')
+    if not PACKS["packdir"]:
+        error("vpacks: packages directory not found")
 
-    dirpaths = glob.glob(PACKS['packdir'] + '*')
-    dirpaths = [d for d in dirpaths if basename(d) not in ['backup', 'logs']]
+    dirpaths = glob.glob(PACKS["packdir"] + "*")
+    dirpaths = [d for d in dirpaths if basename(d) not in ["backup", "logs"]]
 
-    PACKS['dirs'] = {basename(folder): folder for folder in dirpaths
-                     if os.path.isdir(folder)}
+    PACKS["dirs"] = {
+        basename(folder): folder for folder in dirpaths if os.path.isdir(folder)
+    }
 
     # ignore the packages that have been moved in the backups directory
-    bdir      = re.compile(PACKS['bkupdir'])
-    packpaths = glob.glob(PACKS['packdir'] + '*%s*%s*' % (SEP, SEP))
+    bdir = re.compile(PACKS["bkupdir"])
+    packpaths = glob.glob(PACKS["packdir"] + "*%s*%s*" % (SEP, SEP))
     packpaths = list(filter(lambda pdir: not re.search(bdir, pdir), packpaths))
-    PACKS['packs']  = {}
+    PACKS["packs"] = {}
 
     for packpath in packpaths:
         if not os.path.isdir(packpath):
             continue
         key = basename(packpath)
-        if key in PACKS['packs']:
-            WARNINGS.append(('duplicated package', key))
+        if key in PACKS["packs"]:
+            WARNINGS.append(("duplicated package", key))
         else:
-            PACKS['packs'][key] = packpath
+            PACKS["packs"][key] = packpath
 
-    for dir in PACKS['dirs']:
-        for pack in PACKS['packs']:
+    for dir in PACKS["dirs"]:
+        for pack in PACKS["packs"]:
             if pack == dir:
-                msg = 'a package with the same name of a directory exists'
+                msg = "a package with the same name of a directory exists"
                 WARNINGS.append((msg, pack))
 
 
@@ -776,17 +851,18 @@ def _start_or_opt_():
 
 def vimescape(s):
     """Escape filename for the shell."""
-    if os.name == 'nt':
-        return '"' + s.replace('\\\\', '/') + '"'
+    if os.name == "nt":
+        return '"' + s.replace("\\\\", "/") + '"'
     else:
-        return s.replace(' ', '\ ')
+        return s.replace(" ", "\ ")
+
 
 def list_backup_dir():
-    backups = os.listdir(PACKS['bkupdir'])
+    backups = os.listdir(PACKS["bkupdir"])
     if not backups:
-        log('No packages in the backup directory.')
+        log("No packages in the backup directory.")
     else:
-        term_header("Packs in directory", PACKS['bkupdir'])
+        term_header("Packs in directory", PACKS["bkupdir"])
     for pack in backups:
         log(pack)
     sys.exit()
@@ -803,7 +879,7 @@ def wait(pack):
 
 def warn_timeout(name):
     """Log warning when timeout has been reached."""
-    log("%-30s" % (name + ': ') + red("timeout %ds" % int(TIMEOUT)))
+    log("%-30s" % (name + ": ") + red("timeout %ds" % int(TIMEOUT)))
 
 
 def term_header(string, path):
@@ -824,39 +900,39 @@ def write_logfiles():
     Write JSON logfiles: a cumulative one with a timestamp, and one for each
     updated plugin, overwriting existing files.
     """
-    os.makedirs(PACKS['logsdir'], exist_ok=True)
+    os.makedirs(PACKS["logsdir"], exist_ok=True)
     timestamp = strftime("%Y_%m_%d_%H_%M")
     # a logfile for each updated plugin
     for k in LOGFILE:
-        with open(PACKS['logsdir'] + k, 'w') as file:
+        with open(PACKS["logsdir"] + k, "w") as file:
             json.dump(LOGFILE[k], file)
     # the unified logfile only contains stdout's, not stderr's
-    unified = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]['out']}
+    unified = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]["out"]}
     if unified:
-        fname = 'vpacks_update_' + timestamp
-        with open(PACKS['logsdir'] + fname, 'w') as file:
+        fname = "vpacks_update_" + timestamp
+        with open(PACKS["logsdir"] + fname, "w") as file:
             json.dump(unified, file)
     # the errors logfile only contains stderr's
-    errors = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]['err']}
+    errors = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]["err"]}
     if errors:
-        fname = 'vpacks_errors_' + timestamp
-        with open(PACKS['logsdir'] + fname, 'w') as file:
+        fname = "vpacks_errors_" + timestamp
+        with open(PACKS["logsdir"] + fname, "w") as file:
             json.dump(errors, file)
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # COMMAND-LINE ARGUMENTS PARSING
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def walk_arg(arg):
     """Process arguments and build actions queue."""
-    if ( arg in PACKS['dirs'] ):
+    if arg in PACKS["dirs"]:
         QUEUE.append(Packdir(arg))
-    elif ( arg in PACKS['packs'] ):
+    elif arg in PACKS["packs"]:
         QUEUE.append(Package(arg))
     else:
-        error('%s: Pack or pack directory not found.' % arg)
+        error("%s: Pack or pack directory not found." % arg)
 
 
 def parse_args():
@@ -865,30 +941,37 @@ def parse_args():
     global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW
     args = sys.argv[1:]
 
-    while ( args ):
-        if (args[0] in ['-h', '-nd', '-nc', '-ps', '-no',
-                        '-full', '-opt', '-start']):
+    while args:
+        if args[0] in ["-h", "-nd", "-nc", "-ps", "-no", "-full", "-opt", "-start"]:
 
-            if   ( args[0] == '-h'      ): HELP = True
-            elif ( args[0] == '-nd'     ): DECO = False
-            elif ( args[0] == '-nc'     ): COLOR = False
-            elif ( args[0] == '-ps'     ): SHOW_SIZE = True
-            elif ( args[0] == '-no'     ): NO_OUTPUT = True
-            elif ( args[0] == '-full'   ): SHALLOW = False
-            elif ( args[0] == '-opt'    ): ONLY_OPT = True
-            elif ( args[0] == '-start'  ): ONLY_START = True
+            if args[0] == "-h":
+                HELP = True
+            elif args[0] == "-nd":
+                DECO = False
+            elif args[0] == "-nc":
+                COLOR = False
+            elif args[0] == "-ps":
+                SHOW_SIZE = True
+            elif args[0] == "-no":
+                NO_OUTPUT = True
+            elif args[0] == "-full":
+                SHALLOW = False
+            elif args[0] == "-opt":
+                ONLY_OPT = True
+            elif args[0] == "-start":
+                ONLY_START = True
 
             del args[0]
             continue
 
-        if ( args[0] == '-na' ):
+        if args[0] == "-na":
             ASYNC = False
             del args[0]
             continue
 
-        if ( args[0] == '-time' ):
+        if args[0] == "-time":
             del args[0]
-            if ( args ):
+            if args:
                 TIMEOUT = int(args.pop(0))
                 continue
             else:
@@ -897,54 +980,53 @@ def parse_args():
         # exit loop when the first arg is found, that isn't an option
         break
 
-    if ( not args ):
+    if not args:
         print_help()
 
     ACTION = args.pop(0)
     TERMINAL = sys.stdout.isatty()
     COLOR = not NO_OUTPUT and COLOR and DECO
 
-    if ( ACTION not in ACTIONS ):
+    if ACTION not in ACTIONS:
         print_help()
 
-    elif ( ACTION == 'install' ):
+    elif ACTION == "install":
         INSTALL = True
         parse_install(args)
         return
 
-    elif ( ACTION == 'backup' ):
-        os.makedirs(PACKS['bkupdir'], exist_ok=True)
-        if ( not args ):
+    elif ACTION == "backup":
+        os.makedirs(PACKS["bkupdir"], exist_ok=True)
+        if not args:
             list_backup_dir()
 
-    elif ( ACTION == 'restore' ):
-        os.makedirs(PACKS['bkupdir'], exist_ok=True)
+    elif ACTION == "restore":
+        os.makedirs(PACKS["bkupdir"], exist_ok=True)
         parse_restore(args)
         return
 
-    elif ( ACTION == 'logs' ):
-        os.makedirs(PACKS['logsdir'], exist_ok=True)
+    elif ACTION == "logs":
+        os.makedirs(PACKS["logsdir"], exist_ok=True)
         if process_logs(args):
             return
 
-    elif ( ACTION == 'log' ):
-        n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else '-1'
-        EXE = 'log %s --' % n
+    elif ACTION == "log":
+        n = args.pop(0) if (args and re.search("-\d+", args[0])) else "-1"
+        EXE = "log %s --" % n
 
-    elif ( ACTION == 'graph' ):
-        n = args.pop(0) if ( args and re.search('-\d+', args[0]) ) else ''
-        EXE = 'log %s --graph --oneline --' % n
+    elif ACTION == "graph":
+        n = args.pop(0) if (args and re.search("-\d+", args[0])) else ""
+        EXE = "log %s --graph --oneline --" % n
 
-    elif ( ACTION in ['git', 'exe'] ):
-        if ( not args ):
+    elif ACTION in ["git", "exe"]:
+        if not args:
             print_help()
         EXE = args.pop(0)
 
-
     # if no args beyond the command, perform on all packages, in all dirs
     # otherwise perform on args (they could be single packages, or directories)
-    if ( not args ):
-        for d in PACKS['dirs']:
+    if not args:
+        for d in PACKS["dirs"]:
             walk_arg(d)
     else:
         for arg in args:
@@ -963,76 +1045,94 @@ def process_logs(args):
     clear:    clear all vpacks_* logs
     clearall: clear all logs
     """
-    if ( not args ):
+    if not args:
         # print just the contents of the logs directory
-        term_header('Logs in directory', PACKS['logsdir'])
-        subprocess.run(['ls', '-ls'], cwd=PACKS['logsdir'])
+        term_header("Logs in directory", PACKS["logsdir"])
+        subprocess.run(["ls", "-ls"], cwd=PACKS["logsdir"])
 
-    elif args[0] == 'clear':
+    elif args[0] == "clear":
         # clear all vpacks_* logs
-        for f in glob.iglob(PACKS['logsdir'] + 'vpacks_*'):
-            subprocess.run(['rm', f])
+        for f in glob.iglob(PACKS["logsdir"] + "vpacks_*"):
+            subprocess.run(["rm", f])
 
-    elif args[0] == 'clearall':
+    elif args[0] == "clearall":
         # clear all logs
-        for f in glob.iglob(PACKS['logsdir'] + '*'):
-            subprocess.run(['rm', f])
+        for f in glob.iglob(PACKS["logsdir"] + "*"):
+            subprocess.run(["rm", f])
 
-    elif args[0] == 'errors':
-        errors = sorted(list(filter(lambda x: re.search('vpacks_errors_', x)
-                                    is not None, os.listdir(PACKS['logsdir']))))
+    elif args[0] == "errors":
+        errors = sorted(
+            list(
+                filter(
+                    lambda x: re.search("vpacks_errors_", x) is not None,
+                    os.listdir(PACKS["logsdir"]),
+                )
+            )
+        )
         if errors:
-            term_header('Reading', errors[-1])
-            with open(PACKS['logsdir'] + errors[-1]) as file:
+            term_header("Reading", errors[-1])
+            with open(PACKS["logsdir"] + errors[-1]) as file:
                 packs = json.load(file)
                 for name in packs:
-                    if name in PACKS['packs']:
+                    if name in PACKS["packs"]:
                         print("%s\n" % red(name))
-                        print(packs[name]['out'])
-                        print(packs[name]['err'])
+                        print(packs[name]["out"])
+                        print(packs[name]["err"])
         else:
-            error('no errors')
+            error("no errors")
 
-    elif args[0] == 'rm' and re.search('^\d$', args[1]):
+    elif args[0] == "rm" and re.search("^\d$", args[1]):
         # example: 'vpacks logs rm 0' removes the last log
-        logs = sorted(list(filter(lambda x: re.search('vpacks_update_', x) is
-                                  not None, os.listdir(PACKS['logsdir']))),
-                      reverse=True)
+        logs = sorted(
+            list(
+                filter(
+                    lambda x: re.search("vpacks_update_", x) is not None,
+                    os.listdir(PACKS["logsdir"]),
+                )
+            ),
+            reverse=True,
+        )
         if logs:
             ix = min(len(logs) - 1, int(args[1]))
-            subprocess.run(['rm', PACKS['logsdir'] + logs[ix]])
-            errors = PACKS['logsdir'] + logs[ix].replace('update', 'errors')
+            subprocess.run(["rm", PACKS["logsdir"] + logs[ix]])
+            errors = PACKS["logsdir"] + logs[ix].replace("update", "errors")
             if errors:
-                subprocess.run(['rm', errors])
+                subprocess.run(["rm", errors])
         else:
-            error('no logs')
+            error("no logs")
 
-    elif re.search('^\d$', args[0]):
+    elif re.search("^\d$", args[0]):
         # example: 'vpacks logs 0' prints the last log
-        logs = sorted(list(filter(lambda x: re.search('vpacks_update_', x) is
-                                  not None, os.listdir(PACKS['logsdir']))),
-                      reverse=True)
+        logs = sorted(
+            list(
+                filter(
+                    lambda x: re.search("vpacks_update_", x) is not None,
+                    os.listdir(PACKS["logsdir"]),
+                )
+            ),
+            reverse=True,
+        )
         if logs:
             ix = min(len(logs) - 1, int(args[0]))
-            term_header('Reading', logs[ix])
-            with open(PACKS['logsdir'] + logs[ix]) as file:
+            term_header("Reading", logs[ix])
+            with open(PACKS["logsdir"] + logs[ix]) as file:
                 packs = json.load(file)
             for name in packs:
-                if name in PACKS['packs']:
+                if name in PACKS["packs"]:
                     print("%s\n" % green(name))
-                    print(packs[name]['out'])
-                    print(packs[name]['err'])
-            errors = PACKS['logsdir'] + logs[ix].replace('update', 'errors')
+                    print(packs[name]["out"])
+                    print(packs[name]["err"])
+            errors = PACKS["logsdir"] + logs[ix].replace("update", "errors")
             if os.path.isfile(errors):
                 with open(errors) as file:
                     packs = json.load(file)
                     for name in packs:
-                        if name in PACKS['packs']:
+                        if name in PACKS["packs"]:
                             print("%s\n" % red(name))
-                            print(packs[name]['out'])
-                            print(packs[name]['err'])
+                            print(packs[name]["out"])
+                            print(packs[name]["err"])
         else:
-            error('no logs')
+            error("no logs")
     else:
         # each arg will be processed, printing logs for each
         # this will be done in the parse_args() function, not here
@@ -1045,12 +1145,12 @@ def parse_install(args):
     """Parse arguments that follow an 'install' subcommand."""
     global INSTDIR, INSTOPT
     for arg in args:
-        if ( arg == 'opt' ):
+        if arg == "opt":
             INSTOPT = True
-        elif ( arg == 'start' ):
+        elif arg == "start":
             INSTOPT = False
-        elif ( re.search('^dir=\w+', arg) ):
-            INSTDIR = arg.replace('dir=', '')
+        elif re.search("^dir=\w+", arg):
+            INSTDIR = arg.replace("dir=", "")
         else:
             QUEUE.append(arg)
 
@@ -1061,24 +1161,24 @@ def parse_restore(args):
     if not args:
         list_backup_dir()
     for arg in args:
-        if ( arg == 'opt' ):
+        if arg == "opt":
             INSTOPT = True
-        elif ( arg == 'start' ):
+        elif arg == "start":
             INSTOPT = False
-        elif ( re.search('^dir=\w+', arg) ):
-            INSTDIR = arg.replace('dir=', '')
+        elif re.search("^dir=\w+", arg):
+            INSTDIR = arg.replace("dir=", "")
         else:
             QUEUE.append(Package(arg, restore_from_backup=True))
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 #   INSTALL QUEUE PROCESSING
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def clone_output(out):
-    if ( re.search('\nfatal:', out) ):
-        return re.sub('fatal:', red('fatal') + ':', out)
+    if re.search("\nfatal:", out):
+        return re.sub("fatal:", red("fatal") + ":", out)
     else:
         return out
 
@@ -1086,7 +1186,7 @@ def clone_output(out):
 def process_clones():
     """Handle asynch package installation."""
     start = time()
-    while ( PROCESSING ):
+    while PROCESSING:
         i = 0
 
         # --------------------
@@ -1098,10 +1198,10 @@ def process_clones():
                 del PROCESSING[i]
                 break
             if repo.process.poll() is not None:
-                out = repo.process.communicate()[0].decode('utf-8')
-                name = green(repo.user + '/' + repo.name)
-                log(name + ': ' + clone_output(out))
-                PACKS['packs'][repo.name] = repo.path
+                out = repo.process.communicate()[0].decode("utf-8")
+                name = green(repo.user + "/" + repo.name)
+                log(name + ": " + clone_output(out))
+                PACKS["packs"][repo.name] = repo.path
                 Package(repo.name).helptags()
                 del PROCESSING[i]
                 break
@@ -1113,7 +1213,7 @@ def process_clones():
 
         # --------------------
 
-        if ( PROCESSING ):
+        if PROCESSING:
             sleep(0.2)
 
 
@@ -1126,32 +1226,32 @@ def install_packages():
     for q in QUEUE:
         repo = Repo(q)
         if not repo.validate():
-            log(q + ' is not a valid argument')
+            log(q + " is not a valid argument")
             continue
 
-        if repo.name in PACKS['packs']:
-            name = green(repo.user + '/' + repo.name)
-            packdir = PACKS['packs'][repo.name]
-            log(name + ': already installed in ../' + packdir)
+        if repo.name in PACKS["packs"]:
+            name = green(repo.user + "/" + repo.name)
+            packdir = PACKS["packs"][repo.name]
+            log(name + ": already installed in ../" + packdir)
         elif not pdir.has(repo.name):
             pdir.install(repo)
         else:
-            name = green(repo.user + '/' + repo.name)
-            log(name + ': already installed in ' + pdir.path)
+            name = green(repo.user + "/" + repo.name)
+            log(name + ": already installed in " + pdir.path)
 
     process_clones()
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 #   ACTION QUEUE PROCESSING
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def process_asynch(packdir=None, subdir=None):
     """Handle asynch package processing."""
-    update = ACTION == 'update'
+    update = ACTION == "update"
     start = time()
-    while ( PROCESSING ):
+    while PROCESSING:
         i = 0
 
         # --------------------
@@ -1164,7 +1264,7 @@ def process_asynch(packdir=None, subdir=None):
                 break
             if pack.process.poll() is not None:
                 cmd = pack.process.communicate()
-                cmd = [cmd[0].decode('utf-8'), cmd[1].decode('utf-8')]
+                cmd = [cmd[0].decode("utf-8"), cmd[1].decode("utf-8")]
                 if packdir:
                     # output is managed by Packdir class
                     packdir.output(pack.output(cmd, updating=update), subdir)
@@ -1182,7 +1282,7 @@ def process_asynch(packdir=None, subdir=None):
 
         # --------------------
 
-        if ( PROCESSING ):
+        if PROCESSING:
             sleep(0.2)
 
 
@@ -1196,49 +1296,57 @@ def process_action():
     """
     for q in QUEUE:
         actions = {
-            'list':     q.list,          'update':     q.update,
-            'dirty':    q.dirty,         'verbose':    q.verbose,
-            'remotes':  q.remotes,       'fetch':      q.fetch,
-            'move2opt': q.move2opt,      'move2start': q.move2start,
-            'git':      q.git,           'exe':        q.exe,
-            'log':      q.git,           'graph':      q.git,
-            'web':      q.web,           'helptags':   q.helptags,
-            'backup':   q.backup,        'restore':    q.restore,
-            'terminal': q.terminal,      'logs':       q.logs,
-            'lastdiff': q.lastdiff,
+            "list": q.list,
+            "update": q.update,
+            "dirty": q.dirty,
+            "verbose": q.verbose,
+            "remotes": q.remotes,
+            "fetch": q.fetch,
+            "move2opt": q.move2opt,
+            "move2start": q.move2start,
+            "git": q.git,
+            "exe": q.exe,
+            "log": q.git,
+            "graph": q.git,
+            "web": q.web,
+            "helptags": q.helptags,
+            "backup": q.backup,
+            "restore": q.restore,
+            "terminal": q.terminal,
+            "logs": q.logs,
+            "lastdiff": q.lastdiff,
         }
-        log ( actions[ACTION]() )
+        log(actions[ACTION]())
 
     # packages may have been queued for async processing
     process_asynch()
 
     # if updating packages, write a log file
-    if ( LOGFILE ):
+    if LOGFILE:
         write_logfiles()
 
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 #   MAIN QUEUE PROCESSING
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def main():
     """Main function."""
-    find_packs()            # find packages and their directories
-    parse_args()            # build the action/installation queue
+    find_packs()  # find packages and their directories
+    parse_args()  # build the action/installation queue
 
     if INSTALL:
         install_packages()
     else:
         process_action()
 
-    if not NO_OUTPUT:       # leave an empty line at the end
+    if not NO_OUTPUT:  # leave an empty line at the end
         print()
 
     for msg in WARNINGS:
         warning(msg[0], msg[1])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
