@@ -186,6 +186,8 @@ class Package:
             errline = err.split("\n")[0]
 
         if err[:5] == "fatal":
+            if updating:
+                LOGFILE[self.name] = {"out": '', "err": cmd[0] + cmd[1], "time": time()}
             return name + re.sub("^fatal", red("fatal"), errline) + "\n"
 
         if err and not updating:
@@ -906,14 +908,16 @@ def write_logfiles():
     for k in LOGFILE:
         with open(PACKS["logsdir"] + k, "w") as file:
             json.dump(LOGFILE[k], file)
-    # the unified logfile only contains stdout's, not stderr's
+    # the unified logfile contains entries with stdout's
     unified = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]["out"]}
     if unified:
         fname = "vpacks_update_" + timestamp
         with open(PACKS["logsdir"] + fname, "w") as file:
             json.dump(unified, file)
-    # the errors logfile only contains stderr's
-    errors = {k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]["err"]}
+    # the errors logfile contains entries with only stderr's and no stdout's
+    errors = {
+        k: LOGFILE[k] for k in LOGFILE if LOGFILE[k]["err"] and not LOGFILE[k]["out"]
+    }
     if errors:
         fname = "vpacks_errors_" + timestamp
         with open(PACKS["logsdir"] + fname, "w") as file:
