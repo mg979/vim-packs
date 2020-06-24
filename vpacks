@@ -306,7 +306,7 @@ class Package:
                 ljson = json.load(lfile)
             if not ljson["out"]:
                 return self.logs()
-            shas = re.findall("([a-f0-9]{7,8})(?:\.\.|$)", ljson["out"].split("\n")[0])
+            shas = re.findall(r"([a-f0-9]{7,8})(?:\.\.|$)", ljson["out"].split("\n")[0])
             if not shas or len(shas) != 2:
                 return self.logs()
             print("%s\n" % green(self.name))
@@ -326,7 +326,7 @@ class Package:
                     "--launch",
                     "TerminalEmulator",
                     "--working-directory",
-                    "%s" % self.path.replace(" ", "\ "),
+                    "%s" % self.path.replace(" ", r"\ "),
                 ],
                 stderr=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -628,8 +628,8 @@ class Repo:
 
             elif re.search("^https?://", self.arg):
                 self.address = re.sub("/?$", "", self.arg)
-                self.name = re.sub(".*/|(\.git)?/?$", "", self.address)
-                self.user = re.match(".*/([^/]+)/", self.address).group(1)
+                self.name = re.sub(r".*/|(\.git)?/?$", "", self.address)
+                self.user = re.match(r".*/([^/]+)/", self.address).group(1)
         except:
             return False
         return self.address
@@ -755,13 +755,13 @@ def error(string):
     sys.exit()
 
 
-def color(color, string, bold=False, line=False):
+def color(color, string, bold=False, underline=False):
     """Print a colored string."""
     if not COLOR:
         return string
-    b = "\033[1m" if bold else ""
-    l = "\033[4m" if line else ""
-    return COLORS[color] + b + l + string + "\033[0m"
+    bo = "\033[1m" if bold else ""
+    ul = "\033[4m" if underline else ""
+    return COLORS[color] + bo + ul + string + "\033[0m"
 
 
 def green(string):
@@ -854,7 +854,7 @@ def vimescape(s):
     if os.name == "nt":
         return '"' + s.replace("\\\\", "/") + '"'
     else:
-        return s.replace(" ", "\ ")
+        return s.replace(" ", r"\ ")
 
 
 def list_backup_dir():
@@ -1011,11 +1011,11 @@ def parse_args():
             return
 
     elif ACTION == "log":
-        n = args.pop(0) if (args and re.search("-\d+", args[0])) else "-1"
+        n = args.pop(0) if (args and re.search(r"-\d+", args[0])) else "-1"
         EXE = "log %s --" % n
 
     elif ACTION == "graph":
-        n = args.pop(0) if (args and re.search("-\d+", args[0])) else ""
+        n = args.pop(0) if (args and re.search(r"-\d+", args[0])) else ""
         EXE = "log %s --graph --oneline --" % n
 
     elif ACTION in ["git", "exe"]:
@@ -1081,7 +1081,7 @@ def process_logs(args):
         else:
             error("no errors")
 
-    elif args[0] == "rm" and re.search("^\d$", args[1]):
+    elif args[0] == "rm" and re.search(r"^\d$", args[1]):
         # example: 'vpacks logs rm 0' removes the last log
         logs = sorted(
             list(
@@ -1101,7 +1101,7 @@ def process_logs(args):
         else:
             error("no logs")
 
-    elif re.search("^\d$", args[0]):
+    elif re.search(r"^\d$", args[0]):
         # example: 'vpacks logs 0' prints the last log
         logs = sorted(
             list(
@@ -1149,7 +1149,7 @@ def parse_install(args):
             INSTOPT = True
         elif arg == "start":
             INSTOPT = False
-        elif re.search("^dir=\w+", arg):
+        elif re.search(r"^dir=\w+", arg):
             INSTDIR = arg.replace("dir=", "")
         else:
             QUEUE.append(arg)
@@ -1165,7 +1165,7 @@ def parse_restore(args):
             INSTOPT = True
         elif arg == "start":
             INSTOPT = False
-        elif re.search("^dir=\w+", arg):
+        elif re.search(r"^dir=\w+", arg):
             INSTDIR = arg.replace("dir=", "")
         else:
             QUEUE.append(Package(arg, restore_from_backup=True))
