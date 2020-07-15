@@ -8,7 +8,7 @@
 " ========================================================================///
 
 let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
-      \      ? 'python3 ' . fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
+      \      ? 'python3 "' . fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks"'
       \      : fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
 
 fun! vpacks#check_packages() abort
@@ -51,8 +51,8 @@ endfun
 "------------------------------------------------------------------------------
 
 fun! vpacks#install_packages() abort
-  if !executable('sh')
-    echo '[vpacks] sh executable is needed'
+  if !executable('sh') && !executable('bash')
+    echo '[vpacks] sh/bash executable is needed'
     return
   endif
 
@@ -175,19 +175,20 @@ endfun " }}}
 fun! s:run_install(lines, sl) abort
   " Run install command in terminal. {{{1
   let tfile = tempname()
+  let sh = executable('sh') ? 'sh' : 'bash'
   call writefile(a:lines, tfile)
   if get(g:, 'vpacks_force_true_terminal', 0)
-    exe '!sh' . tfile
+    exe '!' . sh  fnameescape(tfile)
   elseif has('nvim')
     vnew
     setlocal bt=nofile bh=hide noswf nobl
-    exe 'terminal sh' tfile
+    exe 'terminal' sh fnameescape(tfile)
     let &l:statusline = a:sl
   elseif has('terminal')
-    exe 'vertical terminal ++noclose ++norestore sh' tfile
+    exe 'vertical terminal ++noclose ++norestore' sh fnameescape(tfile)
     let &l:statusline = a:sl
   else
-    exe '!sh' . tfile
+    exe '!' . sh fnameescape(tfile)
   endif
 endfun " }}}
 
