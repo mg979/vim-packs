@@ -121,12 +121,13 @@ endfun
 
 "------------------------------------------------------------------------------
 
-fun! vpacks#lazy_cmd(name, cmd, bang, args) abort
+fun! vpacks#lazy_cmd(name, cmd, bang, l1, l2, args) abort
   exe "delcommand" a:cmd
   exe "Pack! '".a:name."'"
   if g:vpacks.packages[a:name].status
-    let b = a:bang ? '!' : ''
-    call feedkeys(printf(":%s%s %s\<CR>", a:cmd, b, a:args), 'n')
+    let bang = a:bang ? '!' : ''
+    let range = a:l1 == a:l2 ? '' : a:l1 . ',' . a:l2
+    exe printf(":%s%s%s %s", range, a:cmd, bang, a:args)
   else
     echohl WarningMsg
     echo '[vpacks] could not add package'
@@ -149,7 +150,7 @@ fun! vpacks#lazy_plug(name, plug) abort
       endif
       let extra .= nr2char(c)
     endwhile
-    call feedkeys(substitute(a:plug, '\c<Plug>', "\<Plug>", '') . extra)
+    call feedkeys(substitute(a:plug, '\c<plug>', "\<Plug>", '') . extra)
   else
     echohl WarningMsg
     echo '[vpacks] could not add package'

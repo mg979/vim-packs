@@ -101,8 +101,8 @@ fun! s:make_cmd(name, com) abort
     let cmd = "noremap <silent> %s :call vpacks#lazy_plug('%s', '%s')\<CR>"
     exe printf(cmd, a:com, a:name, a:com)
   else
-    let cmd = "call vpacks#lazy_cmd('%s', '%s', <bang>0, <q-args>)"
-    exe 'com! -bang -nargs=?' a:com printf(cmd, a:name, a:com)
+    let cmd = "call vpacks#lazy_cmd('%s', '%s', <bang>0, <line1>, <line2>, <q-args>)"
+    exe 'com! -nargs=* -bang -range -complete=file' a:com printf(cmd, a:name, a:com)
   endif
 endfun
 
