@@ -288,7 +288,7 @@ class Package:
         if not ASYNC:
             wait(self)
         else:  # add a small delay to avoid too many connections in a short time
-            sleep(0.1)
+            sleep(0.5)
 
     def logs(self):
         log = PACKS["logsdir"] + self.name
@@ -774,6 +774,10 @@ def red(string):
     return color("red", string)
 
 
+def cyan(string):
+    return color("cyan", string)
+
+
 def log(string, end="\n"):
     """Print output if allowed."""
     if not NO_OUTPUT and string:
@@ -1236,7 +1240,11 @@ def install_packages():
         if repo.name in PACKS["packs"]:
             name = green(repo.user + "/" + repo.name)
             packdir = PACKS["packs"][repo.name]
-            log(name + ": already installed in ../" + packdir)
+            log(name + ": already installed in " + cyan(packdir))
+        elif repo.name in os.listdir(PACKS["bkupdir"]):
+            name = green(repo.user + "/" + repo.name)
+            log(green(repo.name) + ": already in backup directory")
+            log(Package(repo.name, restore_from_backup=True).restore())
         elif not pdir.has(repo.name):
             pdir.install(repo)
         else:
