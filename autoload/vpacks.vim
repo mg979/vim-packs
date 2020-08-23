@@ -8,7 +8,7 @@
 " ========================================================================///
 
 let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
-      \      ? 'python3 "' . fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks"'
+      \      ? 'python3 "' . tr(fnamemodify(expand('<sfile>'), ':p:h:h'), '\', '/') . '/vpacks"'
       \      : fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
 
 "------------------------------------------------------------------------------
@@ -52,7 +52,7 @@ endfun
 
 "------------------------------------------------------------------------------
 
-fun! vpacks#install_packages() abort
+fun! vpacks#install_packages(bang, args) abort
   if !executable('sh') && !executable('bash')
     echo '[vpacks] sh/bash executable is needed'
     return
@@ -62,6 +62,10 @@ fun! vpacks#install_packages() abort
   let to_install = filter(copy(packs),
         \'v:val.status != 1 && v:val.url!="" && !has_key(v:val.options, "dir")')
 
+  if !a:bang
+    call filter(to_install, { k,v -> index(split(a:args), k) >= 0 })
+  endif
+
   if empty(map(keys(to_install), 'to_install[v:val].url'))
     echo '[vpacks] no packages to install'
     return
@@ -69,8 +73,8 @@ fun! vpacks#install_packages() abort
 
   let lines = []
   for p in keys(to_install)
-    let cmd = s:install_cmd(packs[p])
-    call add(lines, tr(s:vpacks, '\', '/') . ' ' . cmd)
+    let cmd = s:install_cmd(packs[p]) .s:hook(p)
+    call add(lines, s:vpacks . ' ' . cmd)
   endfor
   call s:run_install(lines, '[vpacks] Installing packages, please wait...')
 endfun
@@ -306,9 +310,10 @@ endfun "}}}
 
 fun! s:install_pack()
   " Install a package from the overview buffer. {{{1
-  let pack = g:vpacks.packages[split(getline('.'))[0]]
+  let name = split(getline('.'))[0]
+  let pack = g:vpacks.packages[name]
   if !empty(pack.url)
-    call vpacks#run(0, s:install_cmd(pack))
+    call vpacks#run(0, s:install_cmd(pack) . s:hook(name))
   else
     echo '[vpacks] not possible to install' pack[0]
   endif

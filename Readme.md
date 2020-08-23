@@ -116,7 +116,7 @@ Pack 'mhinz/vim-grepper', { 'on': ['Grepper', '<plug>(GrepperOperator)'] }
 Pack 'junegunn/fzf', { 'dir': '~/.fzf' }
 
 " installed packages overview, and errors about missing packages
-:PacksCheck
+:PacksList
 
 " try to install missing packages (it won't work with local plugins)
 :PacksInstall
