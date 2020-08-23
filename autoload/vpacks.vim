@@ -11,6 +11,8 @@ let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
       \      ? 'python3 "' . fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks"'
       \      : fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
 
+"------------------------------------------------------------------------------
+
 fun! vpacks#check_packages() abort
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
 
@@ -75,6 +77,47 @@ endfun
 
 "------------------------------------------------------------------------------
 
+fun! vpacks#update_packages(bang, args) abort
+  if has('win32')
+    echo 'Windows not supported'
+    return
+  endif
+  let [cmd, post, args] = [s:vpacks . ' update', '', !empty(a:args)]
+  if !a:bang && !args
+    echo '[vpacks] argument needed'
+    return
+  endif
+  let packs = !a:bang ? split(a:args)
+        \   : map(s:find_paths(), { k,v -> substitute(v, '.*/', '', '') })
+  for pack in packs
+    let hasDirOpt = 0
+    if has_key(g:vpacks.packages, pack)
+      let opts = g:vpacks.packages[pack].options
+      let do = get(opts, 'do', '')
+      let hasDirOpt = has_key(opts, 'dir')
+      if !empty(do)
+        let path = hasDirOpt ? expand(opts.dir) : s:find_paths(pack)
+        let post .= s:banner("Running post-update hooks for " . pack)
+        let post .= ';cd ' . path . ' && ' . do
+      endif
+    endif
+    " we don't want to add to the command the packages that have a 'dir' option
+    " because it means it's not in /pack, so vpacks would fail and terminate
+    if args && !hasDirOpt
+      let cmd .= ' ' . pack
+    endif
+  endfor
+  " if no arg has been found in the packpath, we don't run a bare full update
+  if !a:bang && cmd == s:vpacks . ' update'
+    let [cmd, post] = ['', post[1:]]
+  else
+    let cmd = s:banner('Updating packages...')[1:] . ';' . cmd
+  endif
+  call s:term_start(cmd . post)
+endfun
+
+"------------------------------------------------------------------------------
+
 fun! vpacks#run(bang, cmd, ...) abort
   echo "\r"
   let s:cmd = a:cmd
@@ -107,8 +150,9 @@ fun! vpacks#statusline(...)
   let finish =  '%#IncSearch# FINISHED %#StatusLine# '
   let &l:statusline =  finish . s:cmd
   if &ft == 'vpacks'
+    set nowrap
     setlocal modifiable
-    silent! %s/^---\+/―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――/
+    silent! %s/^---\+/\=repeat('―', 67)/
     setlocal nomodifiable
     setlocal nomodified
   endif
@@ -168,6 +212,11 @@ fun! s:pad(t, n) abort
   endif
 endfun " }}}
 
+fun! s:banner(string)
+  return printf(";echo;echo '%s%s';echo %s%s;echo",
+        \       "\33[93m", a:string, repeat('-', len(a:string)), "\033[0m")
+endfun
+
 fun! s:term_start(cmd, ...) abort
   if has('nvim')
     vnew
@@ -216,7 +265,42 @@ fun! s:install_cmd(pack)
   return cmd . a:pack.url
 endfun " }}}
 
+fun! s:start_packs() abort
+  " Return a list of all packs in pack/*/start. {{{1
+  if !exists('s:packs_in_start')
+    let s:packs_in_start = globpath(&packpath, "**/pack/*/start/*", 0, 1)
+  endif
+  return s:packs_in_start
+endfun "}}}
+
+fun! s:opt_packs() abort
+  " Return a list of all packs in pack/*/opt. {{{1
+  if !exists('s:packs_in_opt')
+    let s:packs_in_opt = globpath(&packpath, "**/pack/*/opt/*", 0, 1)
+  endif
+  return s:packs_in_opt
+endfun "}}}
+
+fun! s:find_paths(...) abort
+  " Return a list with all packages paths, or of a specific package. {{{1
+  if !a:0
+    return s:start_packs() + s:opt_packs()
+  endif
+  for pack in s:start_packs()
+    if pack =~ '\V/' . a:1 . '\$'
+      return pack
+    endif
+  endfor
+  for pack in s:opt_packs()
+    if pack =~ '\V/' . a:1 . '\$'
+      return pack
+    endif
+  endfor
+  return ''
+endfun "}}}
+
 fun! s:install_pack()
+  " Install a package from the overview buffer. {{{1
   let pack = g:vpacks.packages[split(getline('.'))[0]]
   if !empty(pack.url)
     call vpacks#run(0, s:install_cmd(pack))
