@@ -60,6 +60,8 @@ SHOW_SIZE = False
 TIMEOUT = 0
 WARNINGS = []
 LOGFILE = {}
+IGNORE = ".vpacks_ignore"
+FORCE = False
 
 COLORS = {
     "darkred": "\33[31m",
@@ -280,6 +282,9 @@ class Package:
             )
 
     def update(self):
+        if not FORCE and os.path.isfile(self.path + SEP + IGNORE):
+            log(red(self.path) + ": ignored")
+            return
         has_submodules = os.path.isfile(self.path + SEP + ".gitmodules")
         if has_submodules:
             self.shell("git submodule sync --recursive")
@@ -557,6 +562,9 @@ class Packdir:
             self.output(Package(basename(p)).list(show_size), _start_)
 
     def update(self):
+        if not FORCE and os.path.isfile(self.path + SEP + IGNORE):
+            log(red(self.path) + ": ignored")
+            return
         for p in self.walk(_opt_):
             Package(basename(p)).update()
         process_asynch(self, _opt_)
@@ -683,6 +691,7 @@ def print_help():
         ["-full", "do not make shallow clones"],
         ["-opt", "command only considers opt packages"],
         ["-start", "command only considers start packages"],
+        ["-force", "bypass any .vpacks_ignore file"],
     ]
 
     options = options[:4] if not HELP else options[1:]
@@ -745,6 +754,18 @@ def print_help():
     print("\nExamples:\n")
     for e in examples:
         print("\t" + e[0] + "\n\t" + color("darkgreen", e[1]) + "\n")
+
+    if HELP:
+        print(cyan("Ignoring subdirectories/packages during updates\n"))
+        print(
+            "To have a package or a whole subdirectory ignored, create a file\nnamed"
+            + green(".vpacks_ignore")
+            + " at the root of the directory you want to skip."
+        )
+        print("You can force update with the option " + green("-force") + ".\n")
+        print("Examples:")
+        print("\t" + green("~/.vim/pack/colors/.vpacks_ignore"))
+        print("\t" + green("~/.vim/pack/vpacks/start/some_plugin/.vpacks_ignore\n"))
     sys.exit()
 
 
@@ -948,11 +969,21 @@ def walk_arg(arg):
 def parse_args():
     """Parse arguments."""
     global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR, HELP
-    global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW
+    global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW, FORCE
     args = sys.argv[1:]
 
     while args:
-        if args[0] in ["-h", "-nd", "-nc", "-ps", "-no", "-full", "-opt", "-start"]:
+        if args[0] in [
+            "-h",
+            "-nd",
+            "-nc",
+            "-ps",
+            "-no",
+            "-full",
+            "-opt",
+            "-start",
+            "-force",
+        ]:
 
             if args[0] == "-h":
                 HELP = True
@@ -970,6 +1001,8 @@ def parse_args():
                 ONLY_OPT = True
             elif args[0] == "-start":
                 ONLY_START = True
+            elif args[0] == "-force":
+                FORCE = True
 
             del args[0]
             continue
