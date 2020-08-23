@@ -48,12 +48,12 @@ working tree of the plugin:
 
     vpacks install user/repo
 
-The script recognizes the following formats for remote repos:
+The script recognizes the following formats for remote repositories:
 
-- *user/plugin*: a GitHub repo
-- *gh/user/plugin*: a GitHub repo
-- *gl/user/plugin*: a GitLab repo
-- *http(s)://...*: any repo
+- *user/plugin*: a GitHub repository
+- *gh/user/plugin*: same
+- *gl/user/plugin*: a GitLab repository
+- *http(s)://...*: any repository
 
 Repositories are cloned with `--depth 1` (shallow clones) to save disk space.
 
@@ -74,14 +74,14 @@ You can run the shell command from vim, in a terminal buffer if supported:
     Vpacks [arguments]
 
 **NOTE**: the following commands aren't necessary for the plugins to work, if
-you put them in your `pack/*/start/` directories. They actually **require**
-that you keep your plugins in the `pack/*/opt/` directories.
-Only use them if:
+you put them in your `pack/*/start/` directories. They actually **only make
+sense** if you keep your plugins in the `pack/*/opt/` directories. Only use
+them if:
 
 * you want to lazy load some plugins
 * you want greater control on which plugins to load
 * you want a way to have from Vim an overview of the installed plugins
-* you are making the transition from another plugin manager
+* for an easier transition from another plugin manager
 
 The syntax is meant to be very similar to the one used by [vim-plug](https://github.com/junegunn/vim-plug).
 Implementation is still partial, only `on` and `for` options are supported.
@@ -96,7 +96,7 @@ Pack 'tpope/vim-surround'
 
 " packadd a plugin, complete with repo address
 " note that the bang will cause the packadd command to be called *without* bang
-" that means that the package will be immediately be added to the runtimepath
+" that means that the package will be immediately added to the runtimepath
 " and sourced, see ':help initialization'
 Pack! 'vim-airline/vim-airline'
 
@@ -122,5 +122,5 @@ Pack 'junegunn/fzf', { 'dir': '~/.fzf' }
 :PacksInstall
 ```
 
-TODO: improve bash completion, post-install/update hooks, etc.
+TODO: post-install/update hooks
 
