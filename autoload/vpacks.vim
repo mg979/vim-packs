@@ -92,14 +92,8 @@ fun! vpacks#update_packages(bang, args) abort
   for pack in packs
     let hasDirOpt = 0
     if has_key(g:vpacks.packages, pack)
-      let opts = g:vpacks.packages[pack].options
-      let do = get(opts, 'do', '')
-      let hasDirOpt = has_key(opts, 'dir')
-      if !empty(do)
-        let path = hasDirOpt ? expand(opts.dir) : s:find_paths(pack)
-        let post .= s:banner("Running post-update hooks for " . pack)
-        let post .= ';cd ' . path . ' && ' . do
-      endif
+      let post .= s:hook(pack)
+      let hasDirOpt = has_key(g:vpacks.packages[pack].options, 'dir')
     endif
     " we don't want to add to the command the packages that have a 'dir' option
     " because it means it's not in /pack, so vpacks would fail and terminate
@@ -280,6 +274,17 @@ fun! s:opt_packs() abort
   endif
   return s:packs_in_opt
 endfun "}}}
+
+fun! s:hook(pack) abort
+  let opts = g:vpacks.packages[a:pack].options
+  let do = get(opts, 'do', '')
+  if !empty(do)
+    let path = has_key(opts, 'dir') ? expand(opts.dir) : s:find_paths(a:pack)
+    let cmd = s:banner("Running post-update hooks for " . a:pack)
+    return cmd . ';cd ' . path . ' && ' . do
+  endif
+  return ''
+endfun
 
 fun! s:find_paths(...) abort
   " Return a list with all packages paths, or of a specific package. {{{1
