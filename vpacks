@@ -36,6 +36,7 @@ ACTIONS = [
     "restore",
     "terminal",
     "logs",
+    "errors",
     "lastdiff",
 ]
 
@@ -182,12 +183,12 @@ class Package:
 
         if err:
             # limit most error messages to the first line of the error
-            # the full messages can be read with 'vpacks logs errors'
+            # the full messages can be read with 'vpacks errors'
             errline = err.split("\n")[0]
 
         if err[:5] == "fatal":
             if updating:
-                LOGFILE[self.name] = {"out": '', "err": cmd[0] + cmd[1], "time": time()}
+                LOGFILE[self.name] = {"out": "", "err": cmd[0] + cmd[1], "time": time()}
             return name + re.sub("^fatal", red("fatal"), errline) + "\n"
 
         if err and not updating:
@@ -650,6 +651,7 @@ def print_help():
         ["install", "install packages from remote repos"],
         ["verbose", "verbose status (with diff)"],
         ["logs", "show available logs [for package/dir]"],
+        ["errors", "show errors [for package/dir]"],
         ["lastdiff", "show last diff for package/dir (if log is available)"],
         ["dirty", "list only packages with a dirty working tree"],
         ["remotes", "list remotes for packages"],
@@ -716,7 +718,7 @@ def print_help():
             "vpacks install dir=my_packs start mg979/vim-visual-multi",
         ],
         ["Read last update log", "vpacks logs 0"],
-        ["Read last update errors", "vpacks logs errors"],
+        ["Read last update errors", "vpacks errors"],
         ["Run git command", 'vpacks git "branch --list" my_packs'],
     ]
 
@@ -1013,8 +1015,9 @@ def parse_args():
         parse_restore(args)
         return
 
-    elif ACTION == "logs":
+    elif ACTION == "logs" or ACTION == "errors":
         os.makedirs(PACKS["logsdir"], exist_ok=True)
+        args = ["errors"] + args if ACTION == "errors" else args
         if process_logs(args):
             return
 
@@ -1069,6 +1072,12 @@ def process_logs(args):
             subprocess.run(["rm", f])
 
     elif args[0] == "errors":
+        # "errors" should be run alone, if not, we're probably requesting
+        # errors for a package, proceed as for 'vpacks logs {pack}'
+        if len(args) > 1:
+            args.remove("errors")
+            return False
+
         errors = sorted(
             list(
                 filter(
@@ -1326,6 +1335,7 @@ def process_action():
             "restore": q.restore,
             "terminal": q.terminal,
             "logs": q.logs,
+            "errors": q.logs,
             "lastdiff": q.lastdiff,
         }
         log(actions[ACTION]())
