@@ -81,16 +81,11 @@ fun! vpacks#run(bang, cmd, ...) abort
   if a:bang || get(g:, 'vpacks_force_true_terminal', 0)
     exe '!' . s:vpacks . ' ' . a:cmd
   elseif has('nvim')
-    vnew
-    setlocal bt=nofile bh=hide noswf nobl
-    exe 'terminal ' . s:vpacks . ' ' . a:cmd
+    call s:term_start(s:vpacks . ' ' . a:cmd)
     let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
     call s:setftype()
   elseif has('terminal')
-    let opts = {'vertical': 1,
-          \     'exit_cb': { c,j -> timer_start(100, 'vpacks#statusline') },
-          \     'term_name': 'vpacks ' . a:cmd}
-    call term_start(s:vpacks . ' ' . a:cmd, opts)
+    call s:term_start(s:vpacks . ' ' . a:cmd, 'vpacks ' . a:cmd)
     let wait = '%#Search# Please wait... %#StatusLine# '
     let &l:statusline = a:0 ? a:1 : (wait . 'vpacks ' . a:cmd)
     call s:setftype()
@@ -110,7 +105,7 @@ endfun
 
 fun! vpacks#statusline(...)
   let finish =  '%#IncSearch# FINISHED %#StatusLine# '
-  let &l:statusline =  finish . 'vpacks ' . s:cmd
+  let &l:statusline =  finish . s:cmd
   if &ft == 'vpacks'
     setlocal modifiable
     silent! %s/^---\+/―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――/
@@ -172,6 +167,22 @@ fun! s:pad(t, n) abort
     return a:t.spaces
   endif
 endfun " }}}
+
+fun! s:term_start(cmd, ...) abort
+  if has('nvim')
+    vnew
+    setlocal bt=nofile bh=hide noswf nobl
+    exe 'terminal ' . a:cmd
+  elseif has('terminal')
+    let name = a:0 ? a:1 : a:cmd
+    let opts = {'vertical': 1,
+          \     'exit_cb': { c,j -> timer_start(100, 'vpacks#statusline') },
+          \     'term_name': name}
+    call term_start(a:cmd, opts)
+  else
+    exe '!' . a:cmd
+  endif
+endfun
 
 fun! s:run_install(lines, sl) abort
   " Run install command in terminal. {{{1
