@@ -12,9 +12,9 @@ For Vim version 8.0 and above (and `neovim`).
 
 
 
+OVERVIEW                                                     *vpacks-overview*
 ==============================================================================
-                                                             *vpacks-overview*
-1. Overview
+
 
 These are not the instructions for the package manager itself.
 Run `vpacks -h` in a terminal for that.
@@ -29,7 +29,7 @@ You could want to do this for one of the following reasons:
 * you want to lazy load some plugins
 * you want greater control on which plugins to load
 * you want a way to have from Vim an overview of the installed plugins
-* you are making the transition from another plugin manager
+* for an easier transition from another plugin manager
 
 The syntax is meant to be very similar to the one used by |vim-plug| {1}.
 
@@ -37,12 +37,12 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
 
 
 
+COMMANDS                                                     *vpacks-commands*
 ==============================================================================
-                                                             *vpacks-commands*
-2. Commands
+
 
                                                                        *:Pack*
-:Pack[!] {url} [, {options}]
+:Pack[!] {url} [, {options}] ~
 
   Wrapper for vim's |packadd| command.
 
@@ -66,15 +66,16 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
 
 `options`: must be put in a dictionary.
                                                                       example~
-  'for'     lazy load for filetype                           `{'for': 'python'}`
-  'on'      lazy load when ex command is run                 `{'on': 'Explore'}`
-  'pdir'    install in pack/{pdir}/, not in pack/vpacks/     `{'pdir': 'tpope'}`
-  'dir'     can't be managed, but add to runtimepath         `{'dir': '~/.fzf'}`
-  'has'     load if has(condition) is satisfied              `{'has': 'nvim'}`
-  'full'    when installing, perform non-shallow cloning     `{'full': 1}`
+  'for'  lazy load for filetype                          `{'for': 'python'}`
+  'on'   lazy load when ex command is run                `{'on': 'Explore'}`
+  'pdir' install in pack/{pdir}, not in pack/vpacks      `{'pdir': 'tpope'}`
+  'dir'  not in 'packpath', but add to runtimepath       `{'dir': '~/.fzf'}`
+  'do'   post-update hooks (bash only)                   `{'do': './install'}`
+  'has'  load if has(condition) is satisfied             `{'has': 'nvim'}`
+  'full' perform non-shallow cloning when installing     `{'full': 1}`
 
-                                                                 *:PacksCheck*
-:PacksCheck
+                                                                  *:PacksList*
+:PacksList~
 
     Open a diagnostic buffer, that shows which packages have been loaded,
     which are being lazy loaded, their options, and errors if any occurred.
@@ -82,25 +83,34 @@ The syntax is meant to be very similar to the one used by |vim-plug| {1}.
     if the url is valid.
 
                                                                *:PacksInstall*
-:PacksInstall
+:PacksInstall ~
 
     Install all missing packages that have been added with the |Pack| command.
+    It will also run post-update hooks defined by the option 'do'.
+
+                                                                *:PacksUpdate*
+:PacksUpdate[!] [packages]~
+
+    Update given packages, or all packages if <bang> is used without
+    arguments. Differently from `vpacks update` when run from the terminal, it
+    can also update packages that are added with the |Pack| command and the
+    'dir' option (that is, not in the 'packpath'). It will also run
+    post-update hooks defined by the option 'do'.
 
                                                                      *:Vpacks*
-:Vpacks {args}
+:Vpacks {args} ~
 
     Wrapper for `vpacks` that can be run in a vim terminal buffer, if this is
     supported by your vim version.
 
-Note that there is no specific command to update packages: update from the
-command line, or with `Vpacks update` from vim.
 
 
 
+
+EXAMPLES                                                     *vpacks-examples*
 ==============================================================================
-                                                             *vpacks-examples*
-3. Examples
 >
+
   " first add vpacks itself, so that commands will run
   " don't use bang, and be sure that vpacks is in a /opt directory
   " see ':help initialization' for more infos
@@ -128,17 +138,17 @@ command line, or with `Vpacks update` from vim.
   " also working with lists, and plugs
   Pack 'mhinz/vim-grepper', { 'on': ['Grepper', '<plug>(GrepperOperator)'] }
 
-  " not a package, but add to &rtp anyway, cannot be installed or updated
-  Pack 'junegunn/fzf', { 'dir': '~/.fzf' }
+  " not a package, but add to &rtp anyway, can run post-update hooks
+  Pack 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
 
   " infos about added package, and errors about missing packages
-  PacksCheck
+  PacksList
 
   " load if has(condition) is satisfied
   Pack 'vim-airline/vim-airline', {'has': 'nvim'}
 
   " update a specific package from Vim
-  Vpacks update vim-fugitive
+  PacksUpdate vim-fugitive
 
   " install a new package from Vim
   Vpacks install tpope/vim-commentary
