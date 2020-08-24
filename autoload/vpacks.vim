@@ -4,7 +4,7 @@
 " File:        vpacks.vim
 " Url:         https://github.com/mg979/vim-packs
 " License:     MIT License
-" Modified:    gio 29 agosto 2019 23:22:50
+" Modified:    Mon 24 August 2020 01:57:58
 " ========================================================================///
 
 let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
@@ -14,6 +14,7 @@ let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
 "------------------------------------------------------------------------------
 
 fun! vpacks#check_packages() abort
+  " PacksList command.{{{1
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
 
   exe tabpagenr()-1 . 'tabnew'
@@ -48,11 +49,12 @@ fun! vpacks#check_packages() abort
     call append('$', "\t".err)
   endfor
   1
-endfun
+endfun "}}}
 
 "------------------------------------------------------------------------------
 
 fun! vpacks#install_packages(bang, args) abort
+  " PacksInstall command.{{{1
   if !executable('sh') && !executable('bash')
     echo '[vpacks] sh/bash executable is needed'
     return
@@ -77,11 +79,12 @@ fun! vpacks#install_packages(bang, args) abort
     call add(lines, s:vpacks . ' ' . cmd)
   endfor
   call s:run_install(lines, '[vpacks] Installing packages, please wait...')
-endfun
+endfun "}}}
 
 "------------------------------------------------------------------------------
 
 fun! vpacks#update_packages(bang, args) abort
+  " PacksUpdate command.{{{1
   if has('win32')
     echo 'Windows not supported'
     return
@@ -111,54 +114,31 @@ fun! vpacks#update_packages(bang, args) abort
   else
     let cmd = s:banner('Updating packages...')[1:] . ';' . cmd
   endif
+  let s:cmd = cmd
   call s:term_start(cmd . post)
-endfun
+endfun "}}}
 
 "------------------------------------------------------------------------------
 
 fun! vpacks#run(bang, cmd, ...) abort
+  " Vpacks command.{{{1
   echo "\r"
   let s:cmd = a:cmd
   if a:bang || get(g:, 'vpacks_force_true_terminal', 0)
     exe '!' . s:vpacks . ' ' . a:cmd
-  elseif has('nvim')
-    call s:term_start(s:vpacks . ' ' . a:cmd)
-    let &l:statusline = a:0 ? a:1 : ('vpacks ' . a:cmd)
-    call s:setftype()
-  elseif has('terminal')
+  elseif has('nvim') || has('terminal')
     call s:term_start(s:vpacks . ' ' . a:cmd, 'vpacks ' . a:cmd)
     let wait = '%#Search# Please wait... %#StatusLine# '
     let &l:statusline = a:0 ? a:1 : (wait . 'vpacks ' . a:cmd)
-    call s:setftype()
   else
     exe '!' . s:vpacks . ' ' . a:cmd
   endif
-endfun
-
-fun! s:setftype() abort
-    120wincmd |
-    if s:cmd =~ 'lastdiff'
-      setfiletype diff
-    else
-      setfiletype vpacks
-    endif
-endfun
-
-fun! vpacks#statusline(...)
-  let finish =  '%#IncSearch# FINISHED %#StatusLine# '
-  let &l:statusline =  finish . s:cmd
-  if &ft == 'vpacks'
-    set nowrap
-    setlocal modifiable
-    silent! %s/^---\+/\=repeat('―', 67)/
-    setlocal nomodifiable
-    setlocal nomodified
-  endif
-endfun
+endfun "}}}
 
 "------------------------------------------------------------------------------
 
 fun! vpacks#lazy_cmd(name, cmd, bang, l1, l2, args) abort
+  " Load a lazy plugin with its real command.{{{1
   exe "delcommand" a:cmd
   exe "Pack! '".a:name."'"
   if g:vpacks.packages[a:name].status
@@ -170,11 +150,12 @@ fun! vpacks#lazy_cmd(name, cmd, bang, l1, l2, args) abort
     echo '[vpacks] could not add package'
     echohl None
   endif
-endfun
+endfun "}}}
 
 "------------------------------------------------------------------------------
 
 fun! vpacks#lazy_plug(name, plug) abort
+  " Plug for a plugin that has been lazy loaded.{{{1
   exe "unmap" a:plug
   exe "Pack! '".a:name."'"
   if g:vpacks.packages[a:name].status
@@ -193,7 +174,10 @@ fun! vpacks#lazy_plug(name, plug) abort
     echo '[vpacks] could not add package'
     echohl None
   endif
-endfun
+endfun "}}}
+
+
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Helpers
@@ -211,25 +195,53 @@ fun! s:pad(t, n) abort
 endfun " }}}
 
 fun! s:banner(string)
+  " Banner for hooks.{{{1
   return printf(";echo;echo '%s%s';echo %s%s;echo",
         \       "\33[93m", a:string, repeat('-', len(a:string)), "\033[0m")
-endfun
+endfun "}}}
+
+fun! s:setftype() abort
+  " Set filetype for the vpacks buffer.{{{1
+    if s:cmd =~ 'lastdiff'
+      setfiletype diff
+    elseif has('win32') || has('win32unix')
+      setfiletype vpacks
+    endif
+endfun "}}}
+
+fun! s:statusline(...)
+  " Statusline for the vpacks buffer.{{{1
+  let finish =  '%#IncSearch# FINISHED %#StatusLine# '
+  let &l:statusline =  finish . s:cmd
+  if &ft == 'vpacks'
+    set nowrap
+    silent! setlocal modifiable
+    silent! %s/^---\+/\=repeat('―', 67)/
+    setlocal nomodifiable
+    setlocal nomodified
+  endif
+endfun "}}}
 
 fun! s:term_start(cmd, ...) abort
+  " Open a terminal and run a command.{{{1
   if has('nvim')
     vnew
     setlocal bt=nofile bh=hide noswf nobl
-    exe 'terminal ' . a:cmd
+    call termopen(a:cmd, { 'on_exit': { -> timer_start(100, function('s:statusline')) } })
+    " exe 'terminal ' . a:cmd
   elseif has('terminal')
     let name = a:0 ? a:1 : a:cmd
     let opts = {'vertical': 1,
-          \     'exit_cb': { c,j -> timer_start(100, 'vpacks#statusline') },
+          \     'exit_cb': { c,j -> timer_start(100, function('s:statusline')) },
           \     'term_name': name}
     call term_start(a:cmd, opts)
   else
     exe '!' . a:cmd
+    return
   endif
-endfun
+  120wincmd |
+  call s:setftype()
+endfun "}}}
 
 fun! s:run_install(lines, sl) abort
   " Run install command in terminal. {{{1
@@ -280,15 +292,16 @@ fun! s:opt_packs() abort
 endfun "}}}
 
 fun! s:hook(pack) abort
+  " Return the command for the post-update hook, with banner. {{{1
   let opts = g:vpacks.packages[a:pack].options
   let do = get(opts, 'do', '')
   if !empty(do)
     let path = has_key(opts, 'dir') ? expand(opts.dir) : s:find_paths(a:pack)
-    let cmd = s:banner("Running post-update hooks for " . a:pack)
+    let cmd = s:banner("Running hooks for " . a:pack)
     return cmd . ';cd ' . path . ' && ' . do
   endif
   return ''
-endfun
+endfun "}}}
 
 fun! s:find_paths(...) abort
   " Return a list with all packages paths, or of a specific package. {{{1
