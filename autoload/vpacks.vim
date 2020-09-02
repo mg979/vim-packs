@@ -34,7 +34,8 @@ fun! vpacks#check_packages() abort
   endfor
   call append(line('$'), '')
 
-  nnoremap <buffer> I :call <sid>install_pack()<cr>
+  nnoremap <buffer> I :.call <sid>install_pack()<cr>
+  xnoremap <buffer> I :call <sid>install_pack()<cr>
   nnoremap <buffer> D :exe 'Vpacks lastdiff' split(getline('.'))[0]<cr>
   nnoremap <buffer> U :exe 'Vpacks update' split(getline('.'))[0]<cr>
 
@@ -61,24 +62,31 @@ fun! vpacks#install_packages(bang, args) abort
   endif
 
   let [packs, errors] = [g:vpacks.packages, g:vpacks.errors]
-  let to_install = filter(copy(packs),
-        \'v:val.status != 1 && v:val.url!="" && !has_key(v:val.options, "dir")')
 
-  if !a:bang
-    call filter(to_install, { k,v -> index(split(a:args), k) >= 0 })
+  if a:bang
+    let to_install = keys(filter(copy(packs),
+          \'v:val.status != 1 && v:val.url!="" && !has_key(v:val.options, "dir")'))
+  else
+    let to_install = split(a:args)
   endif
 
-  if empty(map(keys(to_install), 'to_install[v:val].url'))
+  if empty(to_install)
     echo '[vpacks] no packages to install'
     return
   endif
 
   let lines = []
-  for p in keys(to_install)
-    let cmd = s:install_cmd(packs[p]) .s:hook(p)
+  for p in to_install
+    if has_key(packs, p)
+      let cmd = s:install_cmd(packs[p]) .s:hook(p)
+    else
+      let cmd = 'install opt ' . p
+    endif
     call add(lines, s:vpacks . ' ' . cmd)
   endfor
-  call s:run_install(lines, '[vpacks] Installing packages, please wait...')
+  let s:cmd = 'packages installation'
+  call s:term_start(join(lines, ';'), s:cmd)
+  let &l:statusline = '%#Search# Installing packages, please wait.... %#StatusLine# '
 endfun "}}}
 
 "------------------------------------------------------------------------------
@@ -225,13 +233,13 @@ endfun "}}}
 fun! s:term_start(cmd, ...) abort
   " Open a terminal and run a command.{{{1
   if has('nvim')
-    vnew
+    botright new
     setlocal bt=nofile bh=hide noswf nobl
     call termopen(a:cmd, { 'on_exit': { -> timer_start(100, function('s:statusline')) } })
     " exe 'terminal ' . a:cmd
   elseif has('terminal')
     let name = a:0 ? a:1 : a:cmd
-    let opts = {'vertical': 1,
+    let opts = {'vertical': 0,
           \     'exit_cb': { c,j -> timer_start(100, function('s:statusline')) },
           \     'term_name': name}
     call term_start(a:cmd, opts)
@@ -242,26 +250,6 @@ fun! s:term_start(cmd, ...) abort
   120wincmd |
   call s:setftype()
 endfun "}}}
-
-fun! s:run_install(lines, sl) abort
-  " Run install command in terminal. {{{1
-  let tfile = tempname()
-  let sh = executable('sh') ? 'sh' : 'bash'
-  call writefile(a:lines, tfile)
-  if get(g:, 'vpacks_force_true_terminal', 0)
-    exe '!' . sh  fnameescape(tfile)
-  elseif has('nvim')
-    vnew
-    setlocal bt=nofile bh=hide noswf nobl
-    exe 'terminal' sh fnameescape(tfile)
-    let &l:statusline = a:sl
-  elseif has('terminal')
-    exe 'vertical terminal ++noclose ++norestore' sh fnameescape(tfile)
-    let &l:statusline = a:sl
-  else
-    exe '!' . sh fnameescape(tfile)
-  endif
-endfun " }}}
 
 fun! s:install_cmd(pack)
   " Generate the command for installation, based on pack options. {{{1
@@ -321,15 +309,25 @@ fun! s:find_paths(...) abort
   return ''
 endfun "}}}
 
-fun! s:install_pack()
+fun! s:install_pack() range
   " Install a package from the overview buffer. {{{1
-  let name = split(getline('.'))[0]
-  let pack = g:vpacks.packages[name]
-  if !empty(pack.url)
-    call vpacks#run(0, s:install_cmd(pack) . s:hook(name))
-  else
-    echo '[vpacks] not possible to install' pack[0]
-  endif
+  let lines = []
+  for ln in range(a:firstline, a:lastline)
+    let name = split(getline(ln))[0]
+    try
+      let pack = g:vpacks.packages[name]
+      if !empty(pack.url)
+        let cmd = s:install_cmd(pack) .s:hook(name)
+        call add(lines, s:vpacks . ' ' . cmd)
+      else
+        echo '[vpacks] no url defined for' name
+      endif
+    catch
+    endtry
+  endfor
+  let s:cmd = 'packages installation'
+  call s:term_start(join(lines, ';'), s:cmd)
+  let &l:statusline = '%#Search# Please wait... %#StatusLine# '
 endfun " }}}
 
 " vim: et sw=2 ts=2 sts=2 fdm=marker
