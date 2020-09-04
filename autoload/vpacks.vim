@@ -254,7 +254,7 @@ endfun "}}}
 fun! s:install_cmd(pack)
   " Generate the command for installation, based on pack options. {{{1
   let cmd = 'install opt '
-  if has_key(a:pack.options, 'shallow') && !a:pack.options.shallow
+  if s:full_clone(a:pack)
     let cmd = '-full ' . cmd
   endif
   if !empty(get(a:pack.options, 'pdir', ''))
@@ -309,6 +309,28 @@ fun! s:find_paths(...) abort
   return ''
 endfun "}}}
 
+fun! s:full_clone(pack) abort
+  " Perform a non-shallow clone
+  return has_key(a:pack.options, 'shallow') && !a:pack.options.shallow
+endfun
+
+fun! s:url(pack) abort
+  let url = split(a:pack.url, '/')
+  if len(url) == 2 || url[0] == 'gh'
+    let site = 'www.github.com/'
+  else
+    let site = 'www.gitlab.com/'
+  endif
+  return 'https://' . site . a:pack.url
+endfun
+
+fun! s:git_clone(pack) abort
+  " Return the command to clone the repo at the desired location.
+  let depth = s:full_clone(a:pack) ? '' : '--depth 1'
+  let basedir = fnamemodify(a:pack.options.dir, ':p:h')
+  return printf("mkdir -p %s && cd %s && git clone --recursive %s %s %s", basedir, basedir, depth, s:url(a:pack), a:pack.options.dir)
+endfun
+
 fun! s:install_pack() range
   " Install a package from the overview buffer. {{{1
   let lines = []
@@ -317,8 +339,13 @@ fun! s:install_pack() range
     try
       let pack = g:vpacks.packages[name]
       if !empty(pack.url)
-        let cmd = s:install_cmd(pack) .s:hook(name)
-        call add(lines, s:vpacks . ' ' . cmd)
+        if has_key(pack.options, 'dir')
+          let cmd = s:git_clone(pack) . s:hook(name)
+          call add(lines, cmd)
+        else
+          let cmd = s:install_cmd(pack) .s:hook(name)
+          call add(lines, s:vpacks . ' ' . cmd)
+        endif
       else
         echo '[vpacks] no url defined for' name
       endif
