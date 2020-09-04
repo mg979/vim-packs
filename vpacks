@@ -886,8 +886,12 @@ def vimescape(s):
         return s.replace(" ", r"\ ")
 
 
+def backups():
+    return os.listdir(PACKS["bkupdir"]) if os.path.exists(PACKS["bkupdir"]) else []
+
+
 def list_backup_dir():
-    backups = os.listdir(PACKS["bkupdir"])
+    backups = backups()
     if not backups:
         log("No packages in the backup directory.")
     else:
@@ -1288,7 +1292,7 @@ def install_packages():
             name = green(repo.user + "/" + repo.name)
             packdir = PACKS["packs"][repo.name]
             log(name + ": already installed in " + cyan(packdir))
-        elif repo.name in os.listdir(PACKS["bkupdir"]):
+        elif repo.name in backups():
             name = green(repo.user + "/" + repo.name)
             log(green(repo.name) + ": already in backup directory")
             log(Package(repo.name, restore_from_backup=True).restore())
