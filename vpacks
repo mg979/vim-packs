@@ -398,8 +398,6 @@ class Package:
             log("Moving " + name + " to /opt")
             subprocess.run(["mv", self.path, pdir + _opt_])
             PACKS["packs"][self.name] = pdir + _opt_ + self.name
-        if not NO_OUTPUT and not silent:
-            Packdir(basename(pdir)).list(show_size=False)
 
     def move2start(self, silent=False):
         name = green(self.name)
@@ -412,8 +410,6 @@ class Package:
             log("Moving " + name + " to /start")
             subprocess.run(["mv", self.path, pdir + _start_])
             PACKS["packs"][self.name] = pdir + _start_ + self.name
-        if not NO_OUTPUT and not silent:
-            Packdir(basename(pdir)).list(show_size=False)
 
 
 # ------------------------------------------------------------------------------
