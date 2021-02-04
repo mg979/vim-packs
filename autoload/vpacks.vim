@@ -7,8 +7,9 @@
 " Modified:    Mon 24 August 2020 01:57:58
 " ========================================================================///
 
+let s:py = executable('python3') ? 'python3' : 'python'
 let s:vpacks = executable('vpacks') ? 'vpacks' : has('win32')
-      \      ? 'python3 "' . tr(fnamemodify(expand('<sfile>'), ':p:h:h'), '\', '/') . '/vpacks"'
+      \      ? s:py . ' "' . tr(fnamemodify(expand('<sfile>'), ':p:h:h'), '\', '/') . '/vpacks"'
       \      : fnamemodify(expand('<sfile>'), ':p:h:h') . '/vpacks'
 
 "------------------------------------------------------------------------------
@@ -132,7 +133,7 @@ fun! vpacks#run(bang, cmd, ...) abort
   " Vpacks command.{{{1
   echo "\r"
   let s:cmd = a:cmd
-  if a:bang || get(g:, 'vpacks_force_true_terminal', 0)
+  if a:bang || get(g:, 'vpacks_force_true_terminal', has('win32'))
     exe '!' . s:vpacks . ' ' . a:cmd
   elseif has('nvim') || has('terminal')
     call s:term_start(s:vpacks . ' ' . a:cmd, 'vpacks ' . a:cmd)
