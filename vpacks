@@ -57,6 +57,7 @@ PROCESSING = []
 QUEUE = []
 SHALLOW = True
 SHOW_SIZE = False
+SHOW_STATUS = False
 TIMEOUT = 0
 WARNINGS = []
 LOGFILE = {}
@@ -244,10 +245,15 @@ class Package:
     # --------------------------------------------------------------------------
 
     def list(self, show_size=None):
+        size = self.size() if (show_size is None and SHOW_SIZE) else ""
+        if not SHOW_STATUS:
+            if size:
+                return "%-31s %10s\n" % (self.name, size)
+            else:
+                return self.name + "\n"
         cmd = self.shell("git status --porcelain")
         left = "%-40s " if COLOR else "%-31s"
         fmt = left + "%-5s %10s\n"
-        size = self.size() if (show_size is None and SHOW_SIZE) else ""
         if cmd[1]:
             vals = (red(self.name), red("ER"), size)
         elif cmd[0]:
@@ -711,6 +717,7 @@ def print_help():
         ["-nc", "no color"],
         ["-no", "no output (for use inside scripts)"],
         ["-na", "no async update/cloning"],
+        ["-ss", 'show repo status for "list" subcommand'],
         ["-ps", 'print size for "list" subcommand'],
         ["-time", "timeout in seconds for operations (default 0)"],
         ["-full", "do not make shallow clones"],
@@ -1023,7 +1030,7 @@ def parse_args():
     """
     Parse arguments.
     """
-    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, ASYNC, COLOR, HELP
+    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, ASYNC, COLOR, HELP, SHOW_STATUS
     global ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW, FORCE, NVIM
     args = sys.argv[1:]
 
@@ -1034,6 +1041,7 @@ def parse_args():
             "-nd",
             "-na",
             "-nc",
+            "-ss",
             "-ps",
             "-no",
             "-full",
@@ -1052,6 +1060,8 @@ def parse_args():
                 ASYNC = False
             elif args[0] == "-nc":
                 COLOR = False
+            elif args[0] == "-ss":
+                SHOW_STATUS = True
             elif args[0] == "-ps":
                 SHOW_SIZE = True
             elif args[0] == "-no":
