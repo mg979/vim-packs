@@ -98,7 +98,9 @@ else:
 
 
 class Package:
-    """Class for vim packages."""
+    """
+    Class for vim packages.
+    """
 
     def __init__(self, name, pdir=None, restore_from_backup=False):
         self.name = name
@@ -142,7 +144,9 @@ class Package:
         return re.search(_start_ + self.name + "$", self.path)
 
     def shell(self, cmd):
-        """Run a shell command, return stdout and stderr."""
+        """
+        Run a shell command, return stdout and stderr.
+        """
         res = subprocess.run(
             cmd.split(" "),
             cwd=self.path,
@@ -152,7 +156,9 @@ class Package:
         return [res.stdout.decode("utf-8"), res.stderr.decode("utf-8")]
 
     def async_shell(self, cmd):
-        """Run a shell command asynchronously."""
+        """
+        Run a shell command asynchronously.
+        """
         return subprocess.Popen(
             cmd.split(" "),
             cwd=self.path,
@@ -174,8 +180,10 @@ class Package:
             return name + c
 
     def output(self, cmd, updating=False):
-        """Merge stdout and stderr if updating packages, otherwise prioritize
-        stderr. Return an empty string if no output at all."""
+        """
+        Merge stdout and stderr if updating packages, otherwise prioritize
+        stderr. Return an empty string if no output at all.
+        """
         if NO_OUTPUT:
             return ""
 
@@ -257,7 +265,9 @@ class Package:
         return fmt % vals
 
     def restore(self):
-        """Move package from backup directory, into packages directory."""
+        """
+        Move package from backup directory, into packages directory.
+        """
         src = PACKS["bkupdir"] + SEP + self.name
         if not os.path.exists(src):
             return red(self.name) + " not in the backup directory"
@@ -266,12 +276,16 @@ class Package:
         return green(self.name) + " moved into directory " + dst + "\n"
 
     def backup(self):
-        """Move package into the backup directory."""
+        """
+        Move package into the backup directory.
+        """
         shutil.move(self.path, PACKS["bkupdir"])
         return green(self.name) + " moved into the backup directory\n"
 
     def helptags(self):
-        """Update helptags for package."""
+        """
+        Update helptags for package.
+        """
         if not VIM:
             return
         docdir = self.path + SEP + "doc"
@@ -418,8 +432,9 @@ class Package:
 
 
 class Packdir:
-    """Class for base package directories."""
-
+    """
+    Class for base package directories.
+    """
     def __init__(self, name):
         self.name = name
         if name in PACKS["dirs"]:
@@ -448,7 +463,9 @@ class Packdir:
             os.makedirs(self.path + _start_)
 
     def has(self, pack, in_opt=False, in_start=False):
-        """Check if package is contained in this packdir."""
+        """
+        Check if package is contained in this packdir.
+        """
         if not in_start:
             for p in self.walk(_opt_):
                 if basename(p) == pack:
@@ -473,7 +490,9 @@ class Packdir:
         return []
 
     def output(self, output, subdir):
-        """Print the header only if there's some package to display."""
+        """
+        Print the header only if there's some package to display.
+        """
         if NO_OUTPUT or not output:
             return
         if not self.has_output_opt and subdir == _opt_ and not ONLY_START:
@@ -601,7 +620,9 @@ class Packdir:
 
 
 class Repo:
-    """Class for remote repositories."""
+    """
+    Class for remote repositories.
+    """
 
     def __init__(self, arg):
         self.arg = arg
@@ -613,7 +634,9 @@ class Repo:
         self.timeout = TIMEOUT
 
     def validate(self):
-        """Fill repo information. If repo is valid, return success."""
+        """
+        Fill repo information. If repo is valid, return success.
+        """
         gh = "https://github.com/"
         gl = "https://gitlab.com/"
 
@@ -648,7 +671,9 @@ class Repo:
 
 
 def print_help():
-    """Print the help and exit."""
+    """
+    Print the help and exit.
+    """
     commands = [
         ["list", "list packages"],
         ["update", "update packages"],
@@ -771,13 +796,17 @@ def print_help():
 
 
 def error(string):
-    """Print an error and exit."""
+    """
+    Print an error and exit.
+    """
     print(string)
     sys.exit()
 
 
 def color(color, string, bold=False, underline=False):
-    """Print a colored string."""
+    """
+    Print a colored string.
+    """
     if not COLOR:
         return string
     bo = "\033[1m" if bold else ""
@@ -798,7 +827,9 @@ def cyan(string):
 
 
 def log(string, end="\n"):
-    """Print output if allowed."""
+    """
+    Print output if allowed.
+    """
     if not NO_OUTPUT and string:
         if os.name == "nt":
             string = string.replace("\\\\", "\\")
@@ -806,7 +837,9 @@ def log(string, end="\n"):
 
 
 def confirm(string):
-    """Always return True with -no option."""
+    """
+    Always return True with -no option.
+    """
     if NO_OUTPUT:
         return True
     print(string + "    ? (y/n)")
@@ -814,14 +847,18 @@ def confirm(string):
 
 
 def warning(msg, pack):
-    """Issue a warning related to some package."""
+    """
+    Issue a warning related to some package.
+    """
     if NO_OUTPUT:
         return True
     log(red("Warning") + ": " + msg + " (" + pack + ")")
 
 
 def find_packs():
-    """Find vim and package directories and basenames."""
+    """
+    Find vim and package directories and basenames.
+    """
     global WARNINGS
     for p in [
         "~\\vimfiles",
@@ -870,12 +907,16 @@ def find_packs():
 
 
 def _start_or_opt_():
-    """Return /start/ or /opt/, with os separators."""
+    """
+    Return /start/ or /opt/, with os separators.
+    """
     return _opt_ if INSTOPT else _start_
 
 
 def vimescape(s):
-    """Escape filename for the shell."""
+    """
+    Escape filename for the shell.
+    """
     if os.name == "nt":
         return '"' + s.replace("\\\\", "/") + '"'
     else:
@@ -898,7 +939,9 @@ def list_backup_dir():
 
 
 def wait(pack):
-    """Wait for process to terminate, handle TimeoutError."""
+    """
+    Wait for process to terminate, handle TimeoutError.
+    """
     try:
         to = TIMEOUT if TIMEOUT else None
         pack.process.wait(timeout=to)
@@ -907,12 +950,16 @@ def wait(pack):
 
 
 def warn_timeout(name):
-    """Log warning when timeout has been reached."""
+    """
+    Log warning when timeout has been reached.
+    """
     log("%-30s" % (name + ": ") + red("timeout %ds" % int(TIMEOUT)))
 
 
 def term_header(string, path):
-    """Print a header in the terminal."""
+    """
+    Print a header in the terminal.
+    """
     if COLOR:
         blue, yelw, end, bold = ("\33[34m", "\33[33m", "\33[0m", "\33[1m")
         log("\n" + blue + "─" * 67 + end)
@@ -957,7 +1004,9 @@ def write_logfiles():
 
 
 def walk_arg(arg):
-    """Process arguments and build actions queue."""
+    """
+    Process arguments and build actions queue.
+    """
     if arg in PACKS["dirs"]:
         QUEUE.append(Packdir(arg))
     elif arg in PACKS["packs"]:
@@ -967,7 +1016,9 @@ def walk_arg(arg):
 
 
 def parse_args():
-    """Parse arguments."""
+    """
+    Parse arguments.
+    """
     global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR, HELP
     global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW, FORCE
     args = sys.argv[1:]
@@ -1197,7 +1248,9 @@ def process_logs(args):
 
 
 def parse_install(args):
-    """Parse arguments that follow an 'install' subcommand."""
+    """
+    Parse arguments that follow an 'install' subcommand.
+    """
     global INSTDIR, INSTOPT
     for arg in args:
         if arg == "opt":
@@ -1211,7 +1264,9 @@ def parse_install(args):
 
 
 def parse_restore(args):
-    """Parse arguments that follow an 'restore' subcommand."""
+    """
+    Parse arguments that follow an 'restore' subcommand.
+    """
     global INSTDIR, INSTOPT
     if not args:
         list_backup_dir()
@@ -1239,7 +1294,9 @@ def clone_output(out):
 
 
 def process_clones():
-    """Handle asynch package installation."""
+    """
+    Handle asynch package installation.
+    """
     start = time()
     while PROCESSING:
         i = 0
@@ -1273,7 +1330,9 @@ def process_clones():
 
 
 def install_packages():
-    """Process the install queue."""
+    """
+    Process the install queue.
+    """
     pdir = Packdir(INSTDIR)
     pdir.ensure_exists()
     instdir = pdir.path + _start_or_opt_()
@@ -1307,7 +1366,9 @@ def install_packages():
 
 
 def process_asynch(packdir=None, subdir=None):
-    """Handle asynch package processing."""
+    """
+    Handle asynch package processing.
+    """
     update = ACTION == "update"
     start = time()
     while PROCESSING:
@@ -1392,7 +1453,9 @@ def process_action():
 
 
 def main():
-    """Main function."""
+    """
+    Main function.
+    """
     find_packs()  # find packages and their directories
     parse_args()  # build the action/installation queue
 
