@@ -91,6 +91,8 @@ elif shutil.which("nvim") is not None:
 else:
     VIM = ""
 
+NVIM = False
+
 
 # ------------------------------------------------------------------------------
 # Package class
@@ -435,6 +437,7 @@ class Packdir:
     """
     Class for base package directories.
     """
+
     def __init__(self, name):
         self.name = name
         if name in PACKS["dirs"]:
@@ -703,6 +706,7 @@ def print_help():
 
     options = [
         ["-h", "extended help"],
+        ["-n", "neovim paths"],
         ["-nd", "no decorations (color, headers)"],
         ["-nc", "no color"],
         ["-no", "no output (for use inside scripts)"],
@@ -715,7 +719,7 @@ def print_help():
         ["-force", "bypass any .vpacks_ignore file"],
     ]
 
-    options = options[:4] if not HELP else options[1:]
+    options = options[:2] if not HELP else options[1:]
 
     instopts = [
         ["opt", "install in /opt directory rather than in /start (DEFAULT)"],
@@ -860,12 +864,12 @@ def find_packs():
     Find vim and package directories and basenames.
     """
     global WARNINGS
-    for p in [
-        "~\\vimfiles",
-        "~/.vim",
-        "~/.local/share/nvim",
-        "~/.local/share/nvim/site",
-    ]:
+    if NVIM:
+        root = ["~/.local/share/nvim", "~/.local/share/nvim/site"]
+    else:
+        root = ["~\\vimfiles", "~/.vim"]
+
+    for p in root:
         path = os.path.expanduser(p).replace("\\", "\\\\")
         if os.path.exists(path + SEP + "pack"):
             PACKS["basedir"] = path + SEP
@@ -874,7 +878,7 @@ def find_packs():
             PACKS["logsdir"] = PACKS["packdir"] + "logs" + SEP
             break
 
-    if not PACKS["packdir"]:
+    if 'packdir' not in PACKS:
         error("vpacks: packages directory not found")
 
     dirpaths = glob.glob(PACKS["packdir"] + "*")
@@ -1019,14 +1023,16 @@ def parse_args():
     """
     Parse arguments.
     """
-    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, INSTALL, ASYNC, EXE, COLOR, HELP
-    global TERMINAL, ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW, FORCE
+    global ACTION, DECO, SHOW_SIZE, NO_OUTPUT, ASYNC, COLOR, HELP
+    global ONLY_START, ONLY_OPT, TIMEOUT, SHALLOW, FORCE, NVIM
     args = sys.argv[1:]
 
     while args:
         if args[0] in [
             "-h",
+            "-n",
             "-nd",
+            "-na",
             "-nc",
             "-ps",
             "-no",
@@ -1038,8 +1044,12 @@ def parse_args():
 
             if args[0] == "-h":
                 HELP = True
+            elif args[0] == "-n":
+                NVIM = True
             elif args[0] == "-nd":
                 DECO = False
+            elif args[0] == "-na":
+                ASYNC = False
             elif args[0] == "-nc":
                 COLOR = False
             elif args[0] == "-ps":
@@ -1058,11 +1068,6 @@ def parse_args():
             del args[0]
             continue
 
-        if args[0] == "-na":
-            ASYNC = False
-            del args[0]
-            continue
-
         if args[0] == "-time":
             del args[0]
             if args:
@@ -1073,7 +1078,11 @@ def parse_args():
 
         # exit loop when the first arg is found, that isn't an option
         break
+    return args
 
+
+def run_command(args):
+    global ACTION, INSTALL, EXE, COLOR, TERMINAL
     if not args:
         print_help()
 
@@ -1456,8 +1465,9 @@ def main():
     """
     Main function.
     """
-    find_packs()  # find packages and their directories
-    parse_args()  # build the action/installation queue
+    args = parse_args()  # build the action/installation queue
+    find_packs()         # find packages and their directories
+    run_command(args)
 
     if INSTALL:
         install_packages()
